@@ -64,6 +64,6 @@ export const DEFAULT_SERVICE_PRODUCTS: {
   { slug: "pos", name: "POS", description: "Point of sale", defaultRevenueType: "subscription" },
   { slug: "wa", name: "WhatsApp Commerce", description: "WhatsApp commerce", defaultRevenueType: "subscription" },
   { slug: "web", name: "Web Development", description: "Custom web projects", defaultRevenueType: "consulting" },
-  { slug: "social", name: "Socials", description: "Social media services", defaultRevenueType: "subscription" },
+  { slug: "socials", name: "Socials", description: "Social media services", defaultRevenueType: "subscription" },
   { slug: "support", name: "Support & Maintenance", description: "Ongoing support", defaultRevenueType: "maintenance" },
 ];
