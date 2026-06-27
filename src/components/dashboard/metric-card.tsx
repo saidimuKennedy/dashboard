@@ -5,6 +5,7 @@ import { cn } from "@/lib/utils";
 interface MetricCardProps {
   title: string;
   value: string | number;
+  fullValue?: string;
   change?: number;
   icon: LucideIcon;
   accent?: "default" | "success" | "warning" | "error" | "revenue" | "analytics";
@@ -19,17 +20,22 @@ const accentClasses = {
   analytics: "text-analytics",
 };
 
-export function MetricCard({ title, value, change, icon: Icon, accent = "default" }: MetricCardProps) {
+export function MetricCard({ title, value, fullValue, change, icon: Icon, accent = "default" }: MetricCardProps) {
   const positive = change !== undefined && change >= 0;
 
   return (
-    <Card>
-      <CardHeader className="flex flex-row items-center justify-between pb-1">
-        <CardTitle className="text-xs font-medium text-muted-foreground">{title}</CardTitle>
-        <Icon className={cn("h-4 w-4", accentClasses[accent])} />
+    <Card className="min-w-0">
+      <CardHeader className="flex flex-row items-center justify-between gap-2 pb-1">
+        <CardTitle className="truncate text-xs font-medium text-muted-foreground">{title}</CardTitle>
+        <Icon className={cn("h-4 w-4 shrink-0", accentClasses[accent])} />
       </CardHeader>
-      <CardContent>
-        <p className="text-2xl font-semibold tracking-tight">{value}</p>
+      <CardContent className="min-w-0">
+        <p
+          className="truncate text-base font-semibold tracking-tight tabular-nums sm:text-lg xl:text-xl"
+          title={fullValue ?? String(value)}
+        >
+          {value}
+        </p>
         {change !== undefined && (
           <div className="mt-1 flex items-center gap-1 text-xs">
             {positive ? (

@@ -1,4 +1,5 @@
 import { ModulePageClient } from "@/components/dashboard/module-page-client";
+import { complianceCreateFields } from "@/config/module-create-fields";
 
 export default function CompliancePage() {
   return (
@@ -10,6 +11,7 @@ export default function CompliancePage() {
       columns={["Requirement", "Status", "Due Date", "Owner"]}
       emptyTitle="No compliance items"
       emptyDescription="Track regulatory requirements and maintain compliance posture."
+      createFields={complianceCreateFields}
     />
   );
 }

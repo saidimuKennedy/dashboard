@@ -1,4 +1,5 @@
 import { ModulePageClient } from "@/components/dashboard/module-page-client";
+import { revenueCreateFields } from "@/config/module-create-fields";
 
 export default function RevenuePage() {
   return (
@@ -10,6 +11,7 @@ export default function RevenuePage() {
       columns={["Description", "Type", "Amount", "Date"]}
       emptyTitle="No revenue entries"
       emptyDescription="Start tracking revenue to monitor business health."
+      createFields={revenueCreateFields}
     />
   );
 }

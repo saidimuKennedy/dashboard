@@ -1,4 +1,5 @@
 import { ModulePageClient } from "@/components/dashboard/module-page-client";
+import { productsCreateFields } from "@/config/module-create-fields";
 
 export default function ProductsPage() {
   return (
@@ -10,6 +11,7 @@ export default function ProductsPage() {
       columns={["Name", "Status", "Updated", "Category"]}
       emptyTitle="No products"
       emptyDescription="Define your product portfolio and track adoption."
+      createFields={productsCreateFields}
     />
   );
 }

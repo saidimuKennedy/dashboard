@@ -19,3 +19,4 @@ export * from "./dashboard";
 export * from "./search";
 export * from "./notification";
 export * from "./admin";
+export * from "./settings";

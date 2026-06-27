@@ -1,4 +1,5 @@
 import { ModulePageClient } from "@/components/dashboard/module-page-client";
+import { risksCreateFields } from "@/config/module-create-fields";
 
 export default function RisksPage() {
   return (
@@ -10,6 +11,7 @@ export default function RisksPage() {
       columns={["Risk", "Level", "Updated", "Owner"]}
       emptyTitle="No risks identified"
       emptyDescription="Document risks to maintain visibility and mitigation plans."
+      createFields={risksCreateFields}
     />
   );
 }

@@ -1,4 +1,5 @@
 import { ModulePageClient } from "@/components/dashboard/module-page-client";
+import { decisionsCreateFields } from "@/config/module-create-fields";
 
 export default function DecisionsPage() {
   return (
@@ -10,6 +11,7 @@ export default function DecisionsPage() {
       columns={["Decision", "Status", "Date", "Owner"]}
       emptyTitle="No decisions logged"
       emptyDescription="Record key decisions to build institutional memory."
+      createFields={decisionsCreateFields}
     />
   );
 }

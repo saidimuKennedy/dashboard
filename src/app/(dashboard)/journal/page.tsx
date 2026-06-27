@@ -1,4 +1,5 @@
 import { ModulePageClient } from "@/components/dashboard/module-page-client";
+import { journalCreateFields } from "@/config/module-create-fields";
 
 export default function JournalPage() {
   return (
@@ -10,6 +11,7 @@ export default function JournalPage() {
       columns={["Date", "Mood", "Updated", "Author"]}
       emptyTitle="No journal entries"
       emptyDescription="Capture your daily reflections and track your founder journey."
+      createFields={journalCreateFields}
     />
   );
 }

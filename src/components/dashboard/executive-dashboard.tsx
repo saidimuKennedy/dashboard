@@ -12,7 +12,7 @@ import {
 import { MetricCard } from "@/components/dashboard/metric-card";
 import { AiBriefCard } from "@/components/dashboard/ai-brief-card";
 import { RecentActivity } from "@/components/dashboard/recent-activity";
-import { formatCurrency } from "@/lib/utils";
+import { formatCurrency, formatCurrencyCompact } from "@/lib/utils";
 
 interface DashboardData {
   kpis: {
@@ -51,7 +51,7 @@ export function ExecutiveDashboard() {
         </p>
       </div>
 
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
+      <div className="grid gap-4 grid-cols-2 md:grid-cols-3 2xl:grid-cols-6">
         <MetricCard
           title="Knowledge"
           value={loading ? "—" : data?.kpis.knowledgeArticles ?? 0}
@@ -64,13 +64,15 @@ export function ExecutiveDashboard() {
         />
         <MetricCard
           title="MRR"
-          value={loading ? "—" : formatCurrency(data?.kpis.mrr ?? 0)}
+          value={loading ? "—" : formatCurrencyCompact(data?.kpis.mrr ?? 0)}
+          fullValue={loading ? undefined : formatCurrency(data?.kpis.mrr ?? 0)}
           icon={TrendingUp}
           accent="revenue"
         />
         <MetricCard
           title="Revenue"
-          value={loading ? "—" : formatCurrency(data?.kpis.totalRevenue ?? 0)}
+          value={loading ? "—" : formatCurrencyCompact(data?.kpis.totalRevenue ?? 0)}
+          fullValue={loading ? undefined : formatCurrency(data?.kpis.totalRevenue ?? 0)}
           icon={DollarSign}
           accent="revenue"
         />

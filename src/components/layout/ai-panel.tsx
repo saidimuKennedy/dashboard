@@ -4,6 +4,8 @@ import { useState } from "react";
 import { ChevronLeft, ChevronRight, Send, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
+import { useMessageHistory } from "@/hooks/use-message-history";
+import { AiMessageContent } from "@/components/ai/ai-message-content";
 import { cn } from "@/lib/utils";
 
 interface Message {
@@ -21,10 +23,12 @@ export function AiPanel() {
     },
   ]);
   const [loading, setLoading] = useState(false);
+  const { pushMessage, onInputChange, handleHistoryKeyDown } = useMessageHistory();
 
   async function handleSend() {
     if (!input.trim() || loading) return;
     const userMessage = input.trim();
+    pushMessage(userMessage);
     setInput("");
     setMessages((prev) => [...prev, { role: "user", content: userMessage }]);
     setLoading(true);
@@ -33,13 +37,21 @@ export function AiPanel() {
       const res = await fetch("/api/v1/ai/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message: userMessage }),
+        credentials: "include",
+        body: JSON.stringify({ prompt: userMessage, persona: "business_advisor" }),
       });
       const json = await res.json();
+      if (!res.ok || !json.success) {
+        setMessages((prev) => [
+          ...prev,
+          { role: "assistant", content: json.message ?? "AI request failed. Please try again." },
+        ]);
+        return;
+      }
       const reply =
-        json?.data?.reply ??
-        json?.data?.message ??
-        "AI assistant is not configured yet. Connect your API key in Settings.";
+        json.data?.response ??
+        json.data?.reply ??
+        "No response received from AI.";
       setMessages((prev) => [...prev, { role: "assistant", content: reply }]);
     } catch {
       setMessages((prev) => [
@@ -90,7 +102,7 @@ export function AiPanel() {
                   : "mr-4 bg-muted text-muted-foreground"
               )}
             >
-              {msg.content}
+              <AiMessageContent content={msg.content} role={msg.role} />
             </div>
           ))}
           {loading && (
@@ -104,8 +116,9 @@ export function AiPanel() {
           <div className="flex gap-2">
             <Textarea
               value={input}
-              onChange={(e) => setInput(e.target.value)}
+              onChange={(e) => onInputChange(e.target.value, setInput)}
               onKeyDown={(e) => {
+                handleHistoryKeyDown(e, input, setInput);
                 if (e.key === "Enter" && !e.shiftKey) {
                   e.preventDefault();
                   handleSend();

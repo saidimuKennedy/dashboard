@@ -2,6 +2,7 @@ import { Sparkles } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
+import { AiMessageContent } from "@/components/ai/ai-message-content";
 
 interface AiBriefCardProps {
   brief?: string;
@@ -26,9 +27,7 @@ export function AiBriefCard({ brief, loading }: AiBriefCardProps) {
             <Skeleton className="h-4 w-4/6" />
           </div>
         ) : (
-          <p className="text-sm leading-relaxed text-muted-foreground">
-            {brief ?? "Your AI brief will appear here once data is available."}
-          </p>
+          <AiMessageContent content={brief ?? "Your AI brief will appear here once data is available."} role="assistant" />
         )}
       </CardContent>
     </Card>

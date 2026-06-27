@@ -1,4 +1,5 @@
 import { ModulePageClient } from "@/components/dashboard/module-page-client";
+import { meetingsCreateFields } from "@/config/module-create-fields";
 
 export default function MeetingsPage() {
   return (
@@ -10,6 +11,7 @@ export default function MeetingsPage() {
       columns={["Title", "Status", "Scheduled", "Participants"]}
       emptyTitle="No meetings"
       emptyDescription="Schedule meetings and let AI capture summaries and action items."
+      createFields={meetingsCreateFields}
     />
   );
 }

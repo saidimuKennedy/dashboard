@@ -1,4 +1,5 @@
 import { ModulePageClient } from "@/components/dashboard/module-page-client";
+import { researchCreateFields } from "@/config/module-create-fields";
 
 export default function ResearchPage() {
   return (
@@ -10,6 +11,7 @@ export default function ResearchPage() {
       columns={["Title", "Stage", "Updated", "Author"]}
       emptyTitle="No research topics"
       emptyDescription="Start tracking research to inform product and market decisions."
+      createFields={researchCreateFields}
     />
   );
 }

@@ -15,6 +15,7 @@ interface ModulePageProps {
   description: string;
   ctaLabel: string;
   onCtaClick?: () => void;
+  showCta?: boolean;
   icon?: LucideIcon;
   loading?: boolean;
   emptyTitle?: string;
@@ -27,6 +28,7 @@ export function ModulePage({
   description,
   ctaLabel,
   onCtaClick,
+  showCta = true,
   loading,
   emptyTitle = "No records yet",
   emptyDescription = "Get started by creating your first entry.",
@@ -39,7 +41,7 @@ export function ModulePage({
           <h1 className="text-xl font-semibold tracking-tight">{title}</h1>
           <p className="mt-1 text-sm text-muted-foreground">{description}</p>
         </div>
-        <Button onClick={onCtaClick}>{ctaLabel}</Button>
+        {showCta ? <Button onClick={onCtaClick}>{ctaLabel}</Button> : null}
       </div>
 
       {loading ? (
@@ -69,9 +71,11 @@ export function ModulePage({
         <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-border py-16 text-center">
           <p className="text-sm font-medium">{emptyTitle}</p>
           <p className="mt-1 max-w-sm text-sm text-muted-foreground">{emptyDescription}</p>
-          <Button className="mt-4" onClick={onCtaClick}>
-            {ctaLabel}
-          </Button>
+          {showCta ? (
+            <Button className="mt-4" onClick={onCtaClick}>
+              {ctaLabel}
+            </Button>
+          ) : null}
         </div>
       )}
     </div>

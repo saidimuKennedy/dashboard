@@ -1,4 +1,5 @@
 import { db } from "@/lib/db";
+import { getDeepSeekApiKey } from "@/lib/ai/deepseek";
 import { knowledgeRepository } from "@/server/repositories/knowledge.repository";
 
 export type AiRequest = {
@@ -35,7 +36,7 @@ async function retrieveContext(query: string, limit = 5) {
 }
 
 async function callDeepSeek(systemPrompt: string, userPrompt: string, temperature = 0.3): Promise<{ content: string; tokens: number }> {
-  const apiKey = process.env.DEEPSEEK_API_KEY;
+  const apiKey = await getDeepSeekApiKey();
   if (!apiKey) {
     return {
       content: `[AI Offline] DeepSeek API key not configured. Based on local knowledge: ${userPrompt.slice(0, 500)}`,

@@ -9,7 +9,8 @@ export default function AnalyticsPage() {
       endpoint="/api/v1/analytics"
       columns={["Metric", "Period", "Value", "Change"]}
       emptyTitle="No analytics data"
-      emptyDescription="Connect data sources to unlock business intelligence."
+      emptyDescription="Analytics populate automatically as you add customers, revenue, and other records."
+      createEnabled={false}
     />
   );
 }

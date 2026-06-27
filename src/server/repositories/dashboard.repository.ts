@@ -1,4 +1,5 @@
 import { db } from "@/lib/db";
+import { getDeepSeekApiKey } from "@/lib/ai/deepseek";
 import { Prisma, ResearchStage } from "@prisma/client";
 
 export const dashboardRepository = {
@@ -41,23 +42,69 @@ export const dashboardRepository = {
       where: { deletedAt: null, type: "subscription", recordedAt: { gte: new Date(new Date().setDate(1)) } },
     });
     const mrr = mrrEntries.reduce((sum, e) => sum + Number(e.amount), 0);
+    const totalRevenue = Number(revenueAgg._sum.amount ?? 0);
+
+    const kpis = {
+      knowledgeArticles: articleCount,
+      customers: customerCount,
+      totalRevenue,
+      mrr,
+      complianceIssues: complianceAtRisk,
+      highRisks: openRisks,
+    };
+
+    let aiBrief = buildFounderBrief(kpis);
+    const deepseekKey = await getDeepSeekApiKey();
+    if (deepseekKey) {
+      try {
+        const { aiService } = await import("@/server/ai/ai.service");
+        const result = await aiService.founderBrief();
+        if (result.response && !result.response.startsWith("[AI Offline]")) {
+          aiBrief = result.response;
+        }
+      } catch {
+        // keep data-driven brief on AI failure
+      }
+    }
 
     return {
-      kpis: {
-        knowledgeArticles: articleCount,
-        customers: customerCount,
-        totalRevenue: Number(revenueAgg._sum.amount ?? 0),
-        mrr,
-        complianceIssues: complianceAtRisk,
-        highRisks: openRisks,
-      },
+      kpis,
       recentMeetings,
       recentJournal,
       notifications,
-      aiBrief: "Welcome to JIP. Connect DeepSeek API key to enable AI briefings.",
+      aiBrief,
     };
   },
 };
+
+function buildFounderBrief(kpis: {
+  knowledgeArticles: number;
+  customers: number;
+  totalRevenue: number;
+  mrr: number;
+  complianceIssues: number;
+  highRisks: number;
+}): string {
+  const parts = [
+    `${kpis.knowledgeArticles} knowledge article${kpis.knowledgeArticles === 1 ? "" : "s"} published.`,
+    `${kpis.customers} active customer${kpis.customers === 1 ? "" : "s"}.`,
+    `MRR at KES ${kpis.mrr.toLocaleString()}.`,
+  ];
+
+  if (kpis.highRisks > 0) {
+    parts.push(`${kpis.highRisks} high-risk item${kpis.highRisks === 1 ? "" : "s"} need review.`);
+  } else {
+    parts.push("No critical risks flagged.");
+  }
+
+  if (kpis.complianceIssues > 0) {
+    parts.push(`${kpis.complianceIssues} compliance issue${kpis.complianceIssues === 1 ? "" : "s"} require attention.`);
+  } else {
+    parts.push("Compliance status is clear.");
+  }
+
+  return parts.join(" ");
+}
 
 export const customerRepository = {
   async list(skip: number, take: number, search?: string) {

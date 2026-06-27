@@ -21,3 +21,10 @@ export function formatCurrency(amount: number, currency = "KES"): string {
     minimumFractionDigits: 0,
   }).format(amount);
 }
+
+export function formatCurrencyCompact(amount: number, currency = "KES"): string {
+  const symbol = currency === "KES" ? "Ksh" : currency;
+  if (amount >= 1_000_000) return `${symbol} ${(amount / 1_000_000).toFixed(1)}M`;
+  if (amount >= 1_000) return `${symbol} ${Math.round(amount / 1_000)}K`;
+  return formatCurrency(amount, currency);
+}
