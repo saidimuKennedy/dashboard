@@ -1,21 +1,33 @@
+import { Prisma } from "@prisma/client";
 import { db } from "@/lib/db";
 import { DEFAULT_SERVICE_PRODUCTS } from "./constants";
 
 export async function ensureDefaultServiceProducts() {
-  for (const product of DEFAULT_SERVICE_PRODUCTS) {
-    const existing =
-      (await db.product.findUnique({ where: { slug: product.slug } })) ??
-      (await db.product.findFirst({
-        where: { name: product.name, deletedAt: null },
-      }));
-    if (existing) continue;
+  await Promise.all(
+    DEFAULT_SERVICE_PRODUCTS.map(async (product) => {
+      const existing = await db.product.findFirst({
+        where: {
+          deletedAt: null,
+          OR: [{ slug: product.slug }, { name: product.name }],
+        },
+        select: { id: true },
+      });
+      if (existing) return;
 
-    await db.product.create({
-      data: {
-        name: product.name,
-        slug: product.slug,
-        description: product.description,
-      },
-    });
-  }
+      try {
+        await db.product.create({
+          data: {
+            name: product.name,
+            slug: product.slug,
+            description: product.description,
+          },
+        });
+      } catch (err) {
+        if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === "P2002") {
+          return;
+        }
+        throw err;
+      }
+    })
+  );
 }

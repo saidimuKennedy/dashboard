@@ -20,7 +20,7 @@ export function RevenueIntelligenceBreakdown({ byIndustry, bySource }: Props) {
 function BreakdownCard({ title, rows }: { title: string; rows: Slice[] }) {
   const total = rows.reduce((s, r) => s + r.amount, 0);
   return (
-    <Card className="rounded-2xl p-5">
+    <Card className="p-5">
       <h3 className="mb-3 text-sm font-semibold">{title}</h3>
       {rows.length === 0 ? (
         <p className="text-sm text-muted-foreground">No paid revenue this month.</p>

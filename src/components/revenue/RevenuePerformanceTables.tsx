@@ -10,7 +10,7 @@ type Props = {
 export function RevenuePerformanceTables({ topAccounts, topProducts }: Props) {
   return (
     <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-      <Card className="overflow-hidden rounded-2xl">
+      <Card className="overflow-hidden">
         <div className="border-b border-border px-5 py-3">
           <h3 className="text-sm font-semibold">Top customers by MRR</h3>
         </div>
@@ -56,7 +56,7 @@ export function RevenuePerformanceTables({ topAccounts, topProducts }: Props) {
         </table>
       </Card>
 
-      <Card className="overflow-hidden rounded-2xl">
+      <Card className="overflow-hidden">
         <div className="border-b border-border px-5 py-3">
           <h3 className="text-sm font-semibold">Top performing products</h3>
         </div>

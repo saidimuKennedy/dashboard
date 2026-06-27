@@ -31,6 +31,30 @@ function addMonths(d: Date, n: number): Date {
   return new Date(d.getFullYear(), d.getMonth() + n, 1);
 }
 
+const MONTH_LABELS = [
+  "Jan",
+  "Feb",
+  "Mar",
+  "Apr",
+  "May",
+  "Jun",
+  "Jul",
+  "Aug",
+  "Sept",
+  "Oct",
+  "Nov",
+  "Dec",
+] as const;
+
+function formatMonthLabel(d: Date, withYear = false): string {
+  const label = MONTH_LABELS[d.getMonth()] ?? "—";
+  return withYear ? `${label} ${String(d.getFullYear()).slice(-2)}` : label;
+}
+
+function monthBucketKey(d: Date): string {
+  return `${d.getFullYear()}-${d.getMonth()}`;
+}
+
 function pctChange(current: number, previous: number): number | null {
   if (previous === 0) return current > 0 ? 100 : null;
   return Math.round(((current - previous) / previous) * 1000) / 10;
@@ -326,16 +350,13 @@ export async function getRevenueCenterSnapshot(
     canRevealPii
   );
 
-  const trend = await buildTrend(now);
-  const bySource = await buildBySource(thisMonthStart, thisMonthEnd);
-  const revenueVsExpenses = await buildRevenueVsExpenses(now);
+  const [trend, bySource, revenueVsExpenses, topProducts] = await Promise.all([
+    buildTrend(now),
+    buildBySource(thisMonthStart, thisMonthEnd),
+    buildRevenueVsExpenses(now),
+    buildTopProducts(thisMonthStart, thisMonthEnd, expensesThisMonth, revenueThisMonth),
+  ]);
   const topAccounts = buildTopAccounts(activeContracts, canRevealPii);
-  const topProducts = await buildTopProducts(
-    thisMonthStart,
-    thisMonthEnd,
-    expensesThisMonth,
-    revenueThisMonth
-  );
 
   const ledger: LedgerRow[] = recentEntries.map((e) => ({
     id: e.id,
@@ -447,33 +468,44 @@ function buildHighlights(
 }
 
 async function buildTrend(now: Date): Promise<RevenueTrendPoint[]> {
+  const trendStart = monthStart(addMonths(now, -11));
+  const trendEnd = monthEnd(now);
+
+  const [revenueEntries, contracts] = await Promise.all([
+    db.revenueEntry.findMany({
+      where: {
+        deletedAt: null,
+        status: PAID,
+        recordedAt: { gte: trendStart, lte: trendEnd },
+      },
+      select: { amount: true, recordedAt: true },
+    }),
+    db.customerContract.findMany({
+      where: {
+        isRetainer: false,
+        status: { in: ACTIVE_CONTRACTS },
+      },
+      select: { mrr: true, value: true, startDate: true },
+    }),
+  ]);
+
+  const revenueByMonth = new Map<string, number>();
+  for (const entry of revenueEntries) {
+    const key = monthBucketKey(entry.recordedAt);
+    revenueByMonth.set(key, (revenueByMonth.get(key) ?? 0) + toAmount(entry.amount));
+  }
+
   const points: RevenueTrendPoint[] = [];
   for (let i = 11; i >= 0; i--) {
     const m = addMonths(now, -i);
     const start = monthStart(m);
     const end = monthEnd(m);
-    const [rev, contracts] = await Promise.all([
-      db.revenueEntry.aggregate({
-        where: {
-          deletedAt: null,
-          status: PAID,
-          recordedAt: { gte: start, lte: end },
-        },
-        _sum: { amount: true },
-      }),
-      db.customerContract.findMany({
-        where: {
-          isRetainer: false,
-          status: { in: ACTIVE_CONTRACTS },
-          startDate: { lte: end },
-        },
-        select: { mrr: true, value: true },
-      }),
-    ]);
-    const mrrSum = contracts.reduce((s, c) => s + contractMrr(c.mrr, c.value), 0);
+    const mrrSum = contracts
+      .filter((c) => c.startDate <= end)
+      .reduce((s, c) => s + contractMrr(c.mrr, c.value), 0);
     points.push({
-      month: start.toLocaleDateString("en-KE", { month: "short", year: "2-digit" }),
-      revenue: toAmount(rev._sum.amount),
+      month: formatMonthLabel(start, true),
+      revenue: revenueByMonth.get(monthBucketKey(start)) ?? 0,
       mrr: mrrSum,
     });
   }
@@ -503,29 +535,48 @@ async function buildBySource(start: Date, end: Date): Promise<RevenueBySourceSli
 }
 
 async function buildRevenueVsExpenses(now: Date): Promise<RevenueVsExpensesPoint[]> {
+  const windowStart = monthStart(addMonths(now, -5));
+  const windowEnd = monthEnd(now);
+
+  const [revenueEntries, expenseEntries] = await Promise.all([
+    db.revenueEntry.findMany({
+      where: {
+        deletedAt: null,
+        status: PAID,
+        recordedAt: { gte: windowStart, lte: windowEnd },
+      },
+      select: { amount: true, recordedAt: true },
+    }),
+    db.expense.findMany({
+      where: {
+        deletedAt: null,
+        recordedAt: { gte: windowStart, lte: windowEnd },
+      },
+      select: { amount: true, recordedAt: true },
+    }),
+  ]);
+
+  const revenueByMonth = new Map<string, number>();
+  for (const entry of revenueEntries) {
+    const key = monthBucketKey(entry.recordedAt);
+    revenueByMonth.set(key, (revenueByMonth.get(key) ?? 0) + toAmount(entry.amount));
+  }
+
+  const expensesByMonth = new Map<string, number>();
+  for (const entry of expenseEntries) {
+    const key = monthBucketKey(entry.recordedAt);
+    expensesByMonth.set(key, (expensesByMonth.get(key) ?? 0) + toAmount(entry.amount));
+  }
+
   const points: RevenueVsExpensesPoint[] = [];
   for (let i = 5; i >= 0; i--) {
     const m = addMonths(now, -i);
     const start = monthStart(m);
-    const end = monthEnd(m);
-    const [rev, exp] = await Promise.all([
-      db.revenueEntry.aggregate({
-        where: {
-          deletedAt: null,
-          status: PAID,
-          recordedAt: { gte: start, lte: end },
-        },
-        _sum: { amount: true },
-      }),
-      db.expense.aggregate({
-        where: { deletedAt: null, recordedAt: { gte: start, lte: end } },
-        _sum: { amount: true },
-      }),
-    ]);
-    const revenue = toAmount(rev._sum.amount);
-    const expenses = toAmount(exp._sum.amount);
+    const key = monthBucketKey(start);
+    const revenue = revenueByMonth.get(key) ?? 0;
+    const expenses = expensesByMonth.get(key) ?? 0;
     points.push({
-      month: start.toLocaleDateString("en-KE", { month: "short" }),
+      month: formatMonthLabel(start),
       revenue,
       expenses,
       net: revenue - expenses,

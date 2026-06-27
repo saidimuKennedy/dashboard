@@ -9,7 +9,7 @@ type Props = {
 
 export function RevenueLedgerTable({ rows }: Props) {
   return (
-    <Card className="overflow-hidden rounded-2xl">
+    <Card className="overflow-hidden">
       <div className="border-b border-border px-5 py-3">
         <h3 className="text-sm font-semibold">Recent revenue entries</h3>
       </div>

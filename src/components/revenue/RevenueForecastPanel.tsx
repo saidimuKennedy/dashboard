@@ -9,7 +9,7 @@ type Props = {
 
 export function RevenueForecastPanel({ forecast }: Props) {
   return (
-    <Card className="space-y-4 rounded-2xl p-5">
+    <Card className="space-y-4 p-5">
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
           <h3 className="text-sm font-semibold">Forecasting</h3>

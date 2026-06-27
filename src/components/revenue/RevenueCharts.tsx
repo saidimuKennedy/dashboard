@@ -39,7 +39,7 @@ export function RevenueCharts({ trend, bySource, revenueVsExpenses }: RevenueCha
 
   return (
     <div className="grid grid-cols-1 gap-4 xl:grid-cols-3">
-      <Card className="rounded-2xl p-5 xl:col-span-2">
+      <Card className="p-5 xl:col-span-2">
         <h3 className="mb-3 text-sm font-semibold">Revenue trend</h3>
         <div className="h-56">
           {trend.length === 0 ? (
@@ -60,7 +60,7 @@ export function RevenueCharts({ trend, bySource, revenueVsExpenses }: RevenueCha
         </div>
       </Card>
 
-      <Card className="rounded-2xl p-5">
+      <Card className="p-5">
         <h3 className="mb-3 text-sm font-semibold">Revenue by source</h3>
         <div className="h-56">
           {pieData.length === 0 ? (
@@ -80,7 +80,7 @@ export function RevenueCharts({ trend, bySource, revenueVsExpenses }: RevenueCha
         </div>
       </Card>
 
-      <Card className="rounded-2xl p-5 xl:col-span-3">
+      <Card className="p-5 xl:col-span-3">
         <h3 className="mb-3 text-sm font-semibold">Revenue vs expenses</h3>
         <div className="h-56">
           {revenueVsExpenses.every((p) => p.revenue === 0 && p.expenses === 0) ? (
