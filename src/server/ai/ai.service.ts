@@ -3,6 +3,17 @@ import { getDeepSeekApiKey } from "@/lib/ai/deepseek";
 import { knowledgeRepository } from "@/server/repositories/knowledge.repository";
 import { analyzeResearchFromChat } from "@/server/ai/research-analysis";
 import { analyzeJournalFromChat } from "@/server/ai/journal-analysis";
+import {
+  analyzeCustomerProfile,
+  analyzeCustomerPortfolio,
+  generateContractContent,
+} from "@/server/ai/customer-analysis";
+import {
+  assertNoPii,
+  buildMaskedCustomerContext,
+  maskPii,
+  type PiiProfile,
+} from "@/lib/ai/pii-mask";
 import { aiConversationRepository } from "@/server/repositories/ai-conversation.repository";
 import type { ResearchChatMessage } from "@/types/research";
 
@@ -31,6 +42,7 @@ const PROMPTS: Record<string, string> = {
   revenue_advisor: "You are a revenue analyst. Analyze financial trends and provide forecasts.",
   founder_brief: "Generate a concise daily executive brief for the founder highlighting priorities, risks, and opportunities.",
   journal_assistant: "You are a founder journal coach. Help the founder reflect on their day — wins, challenges, lessons, and mood. Ask clarifying questions when useful and write in a warm, concise tone.",
+  customer_success_advisor: "You are a customer success advisor. Discuss customers ONLY by their assigned alias. Never ask for or reference real names, emails, phone numbers, or company names. Provide deal insights, product recommendations, and contract advice based on masked profile data.",
 };
 
 async function retrieveContext(query: string, limit = 5) {
@@ -171,5 +183,47 @@ export const aiService = {
 
   async analyzeJournalChat(messages: ResearchChatMessage[]) {
     return analyzeJournalFromChat(callDeepSeek, messages);
+  },
+
+  async chatWithMaskedCustomer(
+    userId: string,
+    profile: PiiProfile,
+    maskedContext: string,
+    prompt: string,
+    conversationId?: string,
+    customerId?: string
+  ): Promise<AiResponse> {
+    const maskedPrompt = maskPii(prompt, profile);
+    assertNoPii(maskedPrompt, profile);
+    assertNoPii(maskedContext, profile);
+
+    return this.chat(userId, {
+      prompt: maskedPrompt,
+      context: [maskedContext],
+      persona: "customer_success_advisor",
+      conversationId,
+      contextKey: customerId ? `/customers/${customerId}` : "/customers",
+    });
+  },
+
+  async analyzeCustomer(profile: PiiProfile, maskedContext: string, alias: string, products: string[]) {
+    assertNoPii(maskedContext, profile);
+    return analyzeCustomerProfile(callDeepSeek, maskedContext, alias, products);
+  },
+
+  async analyzePortfolio(maskedProfiles: string[]) {
+    return analyzeCustomerPortfolio(callDeepSeek, maskedProfiles);
+  },
+
+  async generateCustomerContract(
+    profile: PiiProfile,
+    maskedContext: string,
+    terms: string,
+    templateStyle: string
+  ) {
+    const maskedTerms = maskPii(terms, profile);
+    assertNoPii(maskedContext, profile);
+    assertNoPii(maskedTerms, profile);
+    return generateContractContent(callDeepSeek, maskedContext, maskedTerms, templateStyle);
   },
 };

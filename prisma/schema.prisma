@@ -94,6 +94,21 @@ enum NotificationChannel {
   WHATSAPP
 }
 
+enum CustomerStatus {
+  PROSPECT
+  ACTIVE
+  CHURNED
+  ARCHIVED
+}
+
+enum ContractStatus {
+  DRAFT
+  ACTIVE
+  EXPIRING
+  EXPIRED
+  TERMINATED
+}
+
 model User {
   id            String     @id @default(uuid())
   email         String     @unique
@@ -424,27 +439,70 @@ model Bookmark {
 }
 
 model Customer {
-  id          String    @id @default(uuid())
+  id          String         @id @default(uuid())
   name        String
   company     String?
   email       String?
   phone       String?
   industry    String?
   notes       String?
-  createdAt   DateTime  @default(now()) @map("created_at")
-  updatedAt   DateTime  @updatedAt @map("updated_at")
-  createdBy   String?   @map("created_by")
-  updatedBy   String?   @map("updated_by")
-  deletedAt   DateTime? @map("deleted_at")
-  version     Int       @default(1)
+  status      CustomerStatus @default(ACTIVE)
+  aiAnalysis  Json?          @map("ai_analysis")
+  createdAt   DateTime       @default(now()) @map("created_at")
+  updatedAt   DateTime       @updatedAt @map("updated_at")
+  createdBy   String?        @map("created_by")
+  updatedBy   String?        @map("updated_by")
+  deletedAt   DateTime?      @map("deleted_at")
+  version     Int            @default(1)
 
   meetings   Meeting[]
   feedback   CustomerFeedback[]
   revenue    RevenueEntry[]
   products   CustomerProduct[]
   support    SupportTicket[]
+  contracts  CustomerContract[]
+  alias      CustomerAlias?
 
   @@map("customers")
+}
+
+model CustomerAlias {
+  id         String   @id @default(uuid())
+  customerId String   @unique @map("customer_id")
+  alias      String
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
+
+  customer Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+
+  @@map("customer_aliases")
+}
+
+model CustomerContract {
+  id           String         @id @default(uuid())
+  customerId   String         @map("customer_id")
+  title        String
+  terms        String?
+  content      String?
+  startDate    DateTime       @map("start_date")
+  endDate      DateTime       @map("end_date")
+  value        Decimal?       @db.Decimal(12, 2)
+  currency     String         @default("KES")
+  status       ContractStatus @default(DRAFT)
+  isRetainer   Boolean        @default(false) @map("is_retainer")
+  parentId     String?        @map("parent_id")
+  createdAt    DateTime       @default(now()) @map("created_at")
+  updatedAt    DateTime       @updatedAt @map("updated_at")
+  createdBy    String?        @map("created_by")
+  updatedBy    String?        @map("updated_by")
+
+  customer  Customer           @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  parent    CustomerContract?  @relation("ContractRetainers", fields: [parentId], references: [id], onDelete: SetNull)
+  retainers CustomerContract[] @relation("ContractRetainers")
+
+  @@index([customerId])
+  @@index([endDate])
+  @@map("customer_contracts")
 }
 
 model CustomerFeedback {

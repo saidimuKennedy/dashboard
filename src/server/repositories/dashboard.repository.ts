@@ -119,7 +119,15 @@ export const customerRepository = {
       }),
     };
     const [items, total] = await Promise.all([
-      db.customer.findMany({ where, skip, take, orderBy: { createdAt: "desc" }, include: { products: { include: { product: true } } } }),
+      db.customer.findMany({ where, skip, take, orderBy: { createdAt: "desc" }, include: {
+        alias: true,
+        products: { include: { product: true } },
+        contracts: {
+          where: { isRetainer: false, status: { in: ["ACTIVE", "EXPIRING", "DRAFT"] } },
+          orderBy: { endDate: "asc" },
+          take: 1,
+        },
+      } }),
       db.customer.count({ where }),
     ]);
     return { items, total };
@@ -129,11 +137,17 @@ export const customerRepository = {
     return db.customer.findFirst({
       where: { id, deletedAt: null },
       include: {
+        alias: true,
         products: { include: { product: true } },
         feedback: { orderBy: { createdAt: "desc" } },
         meetings: { orderBy: { createdAt: "desc" } },
         revenue: { orderBy: { recordedAt: "desc" } },
         support: { orderBy: { createdAt: "desc" } },
+        contracts: {
+          where: { isRetainer: false },
+          orderBy: { endDate: "desc" },
+          include: { retainers: { orderBy: { createdAt: "asc" } } },
+        },
       },
     });
   },
@@ -158,6 +172,99 @@ export const customerRepository = {
       db.supportTicket.findMany({ where: { customerId: id, deletedAt: null }, orderBy: { createdAt: "desc" } }),
     ]);
     return { meetings, feedback, revenue, support };
+  },
+
+  async getOrCreateAlias(customerId: string, industry?: string | null) {
+    const existing = await db.customerAlias.findUnique({ where: { customerId } });
+    if (existing) return existing;
+    const { generateDefaultAlias } = await import("@/lib/ai/pii-mask");
+    return db.customerAlias.create({
+      data: { customerId, alias: generateDefaultAlias(industry) },
+    });
+  },
+
+  async upsertAlias(customerId: string, alias: string) {
+    return db.customerAlias.upsert({
+      where: { customerId },
+      create: { customerId, alias },
+      update: { alias },
+    });
+  },
+
+  async updateAiAnalysis(id: string, aiAnalysis: unknown) {
+    return db.customer.update({ where: { id }, data: { aiAnalysis: aiAnalysis as Prisma.InputJsonValue } });
+  },
+
+  async listForPortfolio() {
+    return db.customer.findMany({
+      where: { deletedAt: null },
+      include: {
+        alias: true,
+        products: { include: { product: true } },
+        revenue: { where: { deletedAt: null } },
+        contracts: { where: { isRetainer: false, status: { in: ["ACTIVE", "EXPIRING"] } } },
+      },
+    });
+  },
+};
+
+export const customerContractRepository = {
+  async listByCustomer(customerId: string) {
+    return db.customerContract.findMany({
+      where: { customerId, isRetainer: false },
+      orderBy: { endDate: "desc" },
+      include: { retainers: { orderBy: { createdAt: "asc" } } },
+    });
+  },
+
+  async create(
+    customerId: string,
+    data: Omit<Prisma.CustomerContractCreateInput, "customer">,
+    userId?: string
+  ) {
+    return db.customerContract.create({
+      data: {
+        ...data,
+        customer: { connect: { id: customerId } },
+        createdBy: userId,
+        updatedBy: userId,
+      },
+      include: { retainers: true },
+    });
+  },
+
+  async update(id: string, data: Prisma.CustomerContractUpdateInput, userId?: string) {
+    return db.customerContract.update({
+      where: { id },
+      data: { ...data, updatedBy: userId },
+      include: { retainers: true },
+    });
+  },
+
+  async getById(id: string) {
+    return db.customerContract.findUnique({
+      where: { id },
+      include: { retainers: true, customer: { include: { alias: true } } },
+    });
+  },
+};
+
+export const contractSettingsRepository = {
+  key: "contract_template_settings",
+
+  async get() {
+    const { DEFAULT_CONTRACT_SETTINGS } = await import("@/types/customer");
+    const setting = await db.systemSetting.findUnique({ where: { key: this.key } });
+    if (!setting?.value) return DEFAULT_CONTRACT_SETTINGS;
+    return { ...DEFAULT_CONTRACT_SETTINGS, ...(setting.value as Record<string, unknown>) };
+  },
+
+  async update(value: unknown, userId?: string) {
+    return db.systemSetting.upsert({
+      where: { key: this.key },
+      create: { key: this.key, value: value as Prisma.InputJsonValue, updatedBy: userId },
+      update: { value: value as Prisma.InputJsonValue, updatedBy: userId },
+    });
   },
 };
 
