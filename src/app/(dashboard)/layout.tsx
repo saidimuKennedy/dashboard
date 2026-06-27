@@ -2,7 +2,7 @@ import { redirect } from "next/navigation";
 import { getSession } from "@/lib/auth/session";
 import { Sidebar } from "@/components/layout/sidebar";
 import { Header } from "@/components/layout/header";
-import { AiPanel } from "@/components/layout/ai-panel";
+import { DashboardChromeBoundary } from "@/components/layout/dashboard-chrome";
 
 export default async function DashboardLayout({
   children,
@@ -20,10 +20,7 @@ export default async function DashboardLayout({
       <Sidebar />
       <div className="relative flex min-w-0 flex-1 flex-col">
         <Header user={session} />
-        <div className="flex min-h-0 flex-1">
-          <main className="flex-1 overflow-y-auto p-6">{children}</main>
-          <AiPanel />
-        </div>
+        <DashboardChromeBoundary>{children}</DashboardChromeBoundary>
       </div>
     </div>
   );

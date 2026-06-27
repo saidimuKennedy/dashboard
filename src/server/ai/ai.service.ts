@@ -3,6 +3,7 @@ import { getDeepSeekApiKey } from "@/lib/ai/deepseek";
 import { knowledgeRepository } from "@/server/repositories/knowledge.repository";
 import { analyzeResearchFromChat } from "@/server/ai/research-analysis";
 import { analyzeJournalFromChat } from "@/server/ai/journal-analysis";
+import { aiConversationRepository } from "@/server/repositories/ai-conversation.repository";
 import type { ResearchChatMessage } from "@/types/research";
 
 export type AiRequest = {
@@ -10,6 +11,8 @@ export type AiRequest = {
   context?: string[];
   temperature?: number;
   persona?: string;
+  conversationId?: string;
+  contextKey?: string;
 };
 
 export type AiResponse = {
@@ -17,6 +20,7 @@ export type AiResponse = {
   sources: { id: string; title: string; type: string }[];
   confidence: number;
   tokens: number;
+  conversationId?: string;
 };
 
 const PROMPTS: Record<string, string> = {
@@ -90,14 +94,25 @@ export const aiService = {
 
     const { content, tokens } = await callDeepSeek(systemPrompt, userPrompt, request.temperature);
 
-    let conversation = await db.aiConversation.findFirst({
-      where: { userId, persona },
-      orderBy: { updatedAt: "desc" },
-    });
+    let conversation = request.conversationId
+      ? await db.aiConversation.findFirst({
+          where: { id: request.conversationId, userId },
+        })
+      : null;
 
     if (!conversation) {
       conversation = await db.aiConversation.create({
-        data: { userId, persona, title: request.prompt.slice(0, 80) },
+        data: {
+          userId,
+          persona,
+          contextKey: request.contextKey,
+          title: request.prompt.slice(0, 80),
+        },
+      });
+    } else if (!conversation.title) {
+      await db.aiConversation.update({
+        where: { id: conversation.id },
+        data: { title: request.prompt.slice(0, 80) },
       });
     }
 
@@ -115,11 +130,14 @@ export const aiService = {
       ],
     });
 
+    await aiConversationRepository.touch(conversation.id);
+
     return {
       response: content,
       sources,
       confidence: sources.length > 0 ? 0.85 : 0.6,
       tokens,
+      conversationId: conversation.id,
     };
   },
 

@@ -21,6 +21,8 @@ export const aiRequestSchema = z
     context: z.array(z.string()).optional(),
     temperature: z.number().min(0).max(2).optional(),
     persona: z.string().optional(),
+    conversationId: z.string().uuid().optional(),
+    contextKey: z.string().optional(),
   })
   .refine((data) => Boolean(data.prompt ?? data.message), {
     message: "A prompt or message is required.",
@@ -30,6 +32,14 @@ export const aiRequestSchema = z
     context: data.context,
     temperature: data.temperature,
     persona: data.persona,
+    conversationId: data.conversationId,
+    contextKey: data.contextKey,
   }));
+
+export const aiConversationCreateSchema = z.object({
+  persona: z.string().optional(),
+  contextKey: z.string().optional(),
+  title: z.string().optional(),
+});
 
 export const idBodySchema = z.object({ id: z.string().uuid() });

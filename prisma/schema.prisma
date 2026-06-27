@@ -672,17 +672,19 @@ model AiPrompt {
 }
 
 model AiConversation {
-  id        String   @id @default(uuid())
-  userId    String   @map("user_id")
-  persona   String   @default("business_advisor")
-  title     String?
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
+  id         String   @id @default(uuid())
+  userId     String   @map("user_id")
+  persona    String   @default("business_advisor")
+  contextKey String?  @map("context_key")
+  title      String?
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
 
   user     User        @relation(fields: [userId], references: [id])
   messages AiMessage[]
 
   @@index([userId])
+  @@index([userId, contextKey])
   @@map("ai_conversations")
 }
 

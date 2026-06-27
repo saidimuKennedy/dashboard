@@ -33,7 +33,7 @@ const navItems = [
   { href: "/compliance", label: "Compliance", icon: ShieldCheck },
   { href: "/risks", label: "Risks", icon: AlertTriangle },
   { href: "/analytics", label: "Analytics", icon: BarChart3 },
-  { href: "/ai", label: "AI", icon: Sparkles },
+  { href: "/ai", label: "AI Hub", icon: Sparkles },
   { href: "/settings", label: "Settings", icon: Settings },
 ];
 
