@@ -5,6 +5,8 @@ import {
   AlertTriangle,
   Bot,
   Calendar,
+  Copy,
+  Download,
   FileText,
   Palette,
   Shield,
@@ -199,7 +201,7 @@ export function CustomerDetailModal({ customerId, onClose }: CustomerDetailModal
       });
       const json = await response.json();
       if (json.success) {
-        toast.success("Contract generated with AI.");
+        toast.success("Contract ready — copy or download it below.");
         setGenerateForm({ terms: "", startDate: "", endDate: "", value: "", title: "" });
         fetchCustomer();
         window.dispatchEvent(new Event("customer:updated"));
@@ -597,24 +599,33 @@ function ContractsTab({
               required
             />
             <div className="grid gap-3 sm:grid-cols-3">
-              <Input
-                type="date"
-                value={generateForm.startDate}
-                onChange={(e) => setGenerateForm((f) => ({ ...f, startDate: e.target.value }))}
-                required
-              />
-              <Input
-                type="date"
-                value={generateForm.endDate}
-                onChange={(e) => setGenerateForm((f) => ({ ...f, endDate: e.target.value }))}
-                required
-              />
-              <Input
-                type="number"
-                placeholder="Value (KES)"
-                value={generateForm.value}
-                onChange={(e) => setGenerateForm((f) => ({ ...f, value: e.target.value }))}
-              />
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Start of contract</label>
+                <Input
+                  type="date"
+                  value={generateForm.startDate}
+                  onChange={(e) => setGenerateForm((f) => ({ ...f, startDate: e.target.value }))}
+                  required
+                />
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm font-medium">End of contract</label>
+                <Input
+                  type="date"
+                  value={generateForm.endDate}
+                  onChange={(e) => setGenerateForm((f) => ({ ...f, endDate: e.target.value }))}
+                  required
+                />
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Value (KES)</label>
+                <Input
+                  type="number"
+                  placeholder="Optional"
+                  value={generateForm.value}
+                  onChange={(e) => setGenerateForm((f) => ({ ...f, value: e.target.value }))}
+                />
+              </div>
             </div>
             <Button type="submit" loading={generating}>
               Generate with AI
@@ -656,24 +667,33 @@ function ContractsTab({
                 rows={2}
               />
               <div className="grid gap-3 sm:grid-cols-3">
-                <Input
-                  type="date"
-                  value={retainerForm.startDate}
-                  onChange={(e) => setRetainerForm((f) => ({ ...f, startDate: e.target.value }))}
-                  required
-                />
-                <Input
-                  type="date"
-                  value={retainerForm.endDate}
-                  onChange={(e) => setRetainerForm((f) => ({ ...f, endDate: e.target.value }))}
-                  required
-                />
-                <Input
-                  type="number"
-                  placeholder="Monthly value"
-                  value={retainerForm.value}
-                  onChange={(e) => setRetainerForm((f) => ({ ...f, value: e.target.value }))}
-                />
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Start of contract</label>
+                  <Input
+                    type="date"
+                    value={retainerForm.startDate}
+                    onChange={(e) => setRetainerForm((f) => ({ ...f, startDate: e.target.value }))}
+                    required
+                  />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">End of contract</label>
+                  <Input
+                    type="date"
+                    value={retainerForm.endDate}
+                    onChange={(e) => setRetainerForm((f) => ({ ...f, endDate: e.target.value }))}
+                    required
+                  />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Monthly value</label>
+                  <Input
+                    type="number"
+                    placeholder="Optional"
+                    value={retainerForm.value}
+                    onChange={(e) => setRetainerForm((f) => ({ ...f, value: e.target.value }))}
+                  />
+                </div>
               </div>
               <Button type="submit" variant="outline">
                 Add retainer
@@ -685,19 +705,77 @@ function ContractsTab({
 
       {contracts.map((c) =>
         c.content ? (
-          <Card key={c.id}>
-            <CardHeader>
-              <CardTitle className="text-base">{c.title}</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <pre className="max-h-64 overflow-y-auto whitespace-pre-wrap rounded bg-muted/50 p-4 text-xs">
-                {c.content}
-              </pre>
-            </CardContent>
-          </Card>
+          <ContractDocumentCard key={c.id} contract={c} />
         ) : null
       )}
     </div>
+  );
+}
+
+function slugifyFilename(title: string): string {
+  const slug = title.replace(/[^a-z0-9-_]+/gi, "-").replace(/-+/g, "-").replace(/^-|-$/g, "");
+  return slug || "contract";
+}
+
+async function copyContractContent(content: string) {
+  await navigator.clipboard.writeText(content);
+  toast.success("Contract copied to clipboard");
+}
+
+function downloadContractContent(title: string, content: string) {
+  const blob = new Blob([content], { type: "text/plain;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = `${slugifyFilename(title)}.txt`;
+  link.click();
+  URL.revokeObjectURL(url);
+  toast.success("Contract downloaded");
+}
+
+function ContractDocumentCard({ contract }: { contract: CustomerContract }) {
+  if (!contract.content) return null;
+
+  return (
+    <Card>
+      <CardHeader className="flex flex-row items-start justify-between gap-4 space-y-0">
+        <div className="min-w-0 space-y-1">
+          <CardTitle className="text-base">{contract.title}</CardTitle>
+          <p className="text-xs text-muted-foreground">
+            {new Date(contract.startDate).toLocaleDateString()} →{" "}
+            {new Date(contract.endDate).toLocaleDateString()}
+            {contract.value != null
+              ? ` · ${contract.currency} ${contract.value.toLocaleString()}`
+              : ""}
+          </p>
+        </div>
+        <div className="flex shrink-0 gap-2">
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={() => copyContractContent(contract.content!)}
+          >
+            <Copy className="mr-1.5 h-3.5 w-3.5" />
+            Copy
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={() => downloadContractContent(contract.title, contract.content!)}
+          >
+            <Download className="mr-1.5 h-3.5 w-3.5" />
+            Download
+          </Button>
+        </div>
+      </CardHeader>
+      <CardContent>
+        <pre className="max-h-96 overflow-y-auto whitespace-pre-wrap rounded bg-muted/50 p-4 text-xs leading-relaxed">
+          {contract.content}
+        </pre>
+      </CardContent>
+    </Card>
   );
 }
 
