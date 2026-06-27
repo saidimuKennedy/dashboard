@@ -60,16 +60,26 @@ export type ContractTemplateSettings = {
   footerText: string;
   includeSignatureBlock: boolean;
   companyName: string;
+  contactName: string;
+  contactEmail: string;
+  location: string;
+  documentLabel: string;
+  paymentDetails: string;
 };
 
 export const DEFAULT_CONTRACT_SETTINGS: ContractTemplateSettings = {
-  headerColor: "#1e3a5f",
-  accentColor: "#2563eb",
-  fontFamily: "Georgia, 'Times New Roman', serif",
+  headerColor: "#111827",
+  accentColor: "#1e40af",
+  fontFamily: "Helvetica, Arial, sans-serif",
   logoUrl: "",
-  footerText: "Confidential — Jiaminie Tech Ltd.",
+  footerText: "Thank you for your business. — Jiaminie Tech",
   includeSignatureBlock: true,
-  companyName: "Jiaminie Tech Ltd.",
+  companyName: "Jiaminie Tech",
+  contactName: "Kennedy Saidimu",
+  contactEmail: "waruirukennedy2@gmail.com",
+  location: "Nairobi, Kenya",
+  documentLabel: "Service Agreement",
+  paymentDetails: "Payment terms as specified in this agreement. Please reference the contract number on all correspondence.",
 };
 
 export type CustomerListItem = {

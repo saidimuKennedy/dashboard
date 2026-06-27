@@ -22,6 +22,7 @@ import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
+import { downloadContractPdf } from "@/lib/contracts/generate-contract-pdf";
 import {
   DEFAULT_CONTRACT_SETTINGS,
   enrichContract,
@@ -201,7 +202,7 @@ export function CustomerDetailModal({ customerId, onClose }: CustomerDetailModal
       });
       const json = await response.json();
       if (json.success) {
-        toast.success("Contract ready — copy or download it below.");
+        toast.success("Contract ready — download the styled PDF below.");
         setGenerateForm({ terms: "", startDate: "", endDate: "", value: "", title: "" });
         fetchCustomer();
         window.dispatchEvent(new Event("customer:updated"));
@@ -399,6 +400,9 @@ export function CustomerDetailModal({ customerId, onClose }: CustomerDetailModal
               onGenerate={generateContract}
               onAddRetainer={addRetainer}
               generating={generating}
+              contractSettings={contractSettings}
+              clientName={customer?.name ?? "Client"}
+              clientCompany={customer?.company}
             />
           ) : tab === "settings" ? (
             <SettingsTab
@@ -565,6 +569,9 @@ function ContractsTab({
   onGenerate,
   onAddRetainer,
   generating,
+  contractSettings,
+  clientName,
+  clientCompany,
 }: {
   contracts: CustomerContract[];
   generateForm: { terms: string; startDate: string; endDate: string; value: string; title: string };
@@ -574,6 +581,9 @@ function ContractsTab({
   onGenerate: (e: FormEvent) => void;
   onAddRetainer: (e: FormEvent) => void;
   generating: boolean;
+  contractSettings: ContractTemplateSettings;
+  clientName: string;
+  clientCompany?: string | null;
 }) {
   return (
     <div className="space-y-6">
@@ -705,16 +715,17 @@ function ContractsTab({
 
       {contracts.map((c) =>
         c.content ? (
-          <ContractDocumentCard key={c.id} contract={c} />
+          <ContractDocumentCard
+            key={c.id}
+            contract={c}
+            settings={contractSettings}
+            clientName={clientName}
+            clientCompany={clientCompany}
+          />
         ) : null
       )}
     </div>
   );
-}
-
-function slugifyFilename(title: string): string {
-  const slug = title.replace(/[^a-z0-9-_]+/gi, "-").replace(/-+/g, "-").replace(/^-|-$/g, "");
-  return slug || "contract";
 }
 
 async function copyContractContent(content: string) {
@@ -722,18 +733,31 @@ async function copyContractContent(content: string) {
   toast.success("Contract copied to clipboard");
 }
 
-function downloadContractContent(title: string, content: string) {
-  const blob = new Blob([content], { type: "text/plain;charset=utf-8" });
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement("a");
-  link.href = url;
-  link.download = `${slugifyFilename(title)}.txt`;
-  link.click();
-  URL.revokeObjectURL(url);
-  toast.success("Contract downloaded");
+async function handleDownloadContract(
+  contract: CustomerContract,
+  settings: ContractTemplateSettings,
+  clientName: string,
+  clientCompany?: string | null
+) {
+  try {
+    await downloadContractPdf({ contract, settings, clientName, clientCompany });
+    toast.success("Contract PDF downloaded");
+  } catch {
+    toast.error("Failed to generate PDF. Try again.");
+  }
 }
 
-function ContractDocumentCard({ contract }: { contract: CustomerContract }) {
+function ContractDocumentCard({
+  contract,
+  settings,
+  clientName,
+  clientCompany,
+}: {
+  contract: CustomerContract;
+  settings: ContractTemplateSettings;
+  clientName: string;
+  clientCompany?: string | null;
+}) {
   if (!contract.content) return null;
 
   return (
@@ -763,10 +787,10 @@ function ContractDocumentCard({ contract }: { contract: CustomerContract }) {
             type="button"
             variant="outline"
             size="sm"
-            onClick={() => downloadContractContent(contract.title, contract.content!)}
+            onClick={() => handleDownloadContract(contract, settings, clientName, clientCompany)}
           >
             <Download className="mr-1.5 h-3.5 w-3.5" />
-            Download
+            Download PDF
           </Button>
         </div>
       </CardHeader>
@@ -795,13 +819,48 @@ function SettingsTab({
       <form className="space-y-4" onSubmit={onSave}>
         <div className="flex items-center gap-2">
           <Palette className="h-4 w-4 text-primary" />
-          <h3 className="font-medium">Contract appearance</h3>
+          <h3 className="font-medium">Contract PDF appearance</h3>
         </div>
+        <p className="text-xs text-muted-foreground">
+          These settings are applied when you download a contract as PDF.
+        </p>
         <div className="space-y-2">
           <label className="text-sm">Company name</label>
           <Input
             value={settings.companyName}
             onChange={(e) => setSettings((s) => ({ ...s, companyName: e.target.value }))}
+          />
+        </div>
+        <div className="grid gap-3 sm:grid-cols-2">
+          <div className="space-y-2">
+            <label className="text-sm">Contact name</label>
+            <Input
+              value={settings.contactName}
+              onChange={(e) => setSettings((s) => ({ ...s, contactName: e.target.value }))}
+            />
+          </div>
+          <div className="space-y-2">
+            <label className="text-sm">Contact email</label>
+            <Input
+              type="email"
+              value={settings.contactEmail}
+              onChange={(e) => setSettings((s) => ({ ...s, contactEmail: e.target.value }))}
+            />
+          </div>
+        </div>
+        <div className="space-y-2">
+          <label className="text-sm">Location</label>
+          <Input
+            value={settings.location}
+            onChange={(e) => setSettings((s) => ({ ...s, location: e.target.value }))}
+          />
+        </div>
+        <div className="space-y-2">
+          <label className="text-sm">Document label</label>
+          <Input
+            value={settings.documentLabel}
+            onChange={(e) => setSettings((s) => ({ ...s, documentLabel: e.target.value }))}
+            placeholder="Service Agreement"
           />
         </div>
         <div className="grid gap-3 sm:grid-cols-2">
@@ -827,10 +886,19 @@ function SettingsTab({
           <Input
             value={settings.fontFamily}
             onChange={(e) => setSettings((s) => ({ ...s, fontFamily: e.target.value }))}
+            placeholder="Helvetica, Arial, sans-serif"
           />
         </div>
         <div className="space-y-2">
-          <label className="text-sm">Footer text</label>
+          <label className="text-sm">Payment / terms footer</label>
+          <Textarea
+            value={settings.paymentDetails}
+            onChange={(e) => setSettings((s) => ({ ...s, paymentDetails: e.target.value }))}
+            rows={3}
+          />
+        </div>
+        <div className="space-y-2">
+          <label className="text-sm">Closing footer text</label>
           <Input
             value={settings.footerText}
             onChange={(e) => setSettings((s) => ({ ...s, footerText: e.target.value }))}
@@ -851,36 +919,83 @@ function SettingsTab({
 
       <Card>
         <CardHeader>
-          <CardTitle className="text-base">Preview</CardTitle>
+          <CardTitle className="text-base">PDF preview</CardTitle>
         </CardHeader>
         <CardContent>
           <div
-            className="rounded-lg border p-4 text-sm"
+            className="rounded-lg border bg-white p-5 text-sm text-gray-900 shadow-sm"
             style={{ fontFamily: settings.fontFamily }}
           >
-            <div
-              className="mb-4 rounded px-3 py-2 text-white"
-              style={{ backgroundColor: settings.headerColor }}
-            >
-              {settings.companyName}
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <p
+                  className="text-lg font-bold tracking-wide"
+                  style={{ color: settings.headerColor }}
+                >
+                  {settings.companyName.toUpperCase()}
+                </p>
+                <p className="mt-2 text-xs text-gray-500">{settings.contactName}</p>
+                <p className="text-xs text-gray-500">{settings.contactEmail}</p>
+                <p className="text-xs text-gray-500">{settings.location}</p>
+              </div>
+              <span
+                className="rounded px-2 py-1 text-[10px] font-bold uppercase tracking-wider text-white"
+                style={{ backgroundColor: settings.accentColor }}
+              >
+                {settings.documentLabel}
+              </span>
             </div>
-            <p className="mb-2" style={{ color: settings.accentColor }}>
-              SERVICE AGREEMENT
+            <div className="my-4 border-t border-gray-200" />
+            <p className="text-[10px] font-bold uppercase tracking-wider" style={{ color: settings.accentColor }}>
+              Client
             </p>
-            <p className="text-muted-foreground">Between {settings.companyName} and [CLIENT_ALIAS]</p>
-            {settings.includeSignatureBlock ? (
-              <div className="mt-6 grid grid-cols-2 gap-4 border-t pt-4 text-xs">
+            <p className="mt-1 font-semibold">[Client Name]</p>
+            <div className="mt-4 rounded bg-gray-50 p-3 text-xs">
+              <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <p className="text-muted-foreground">Provider signature</p>
-                  <div className="mt-6 border-b border-border" />
+                  <p className="text-gray-400">Contract No.</p>
+                  <p className="font-semibold">CTR-2026-001</p>
                 </div>
                 <div>
-                  <p className="text-muted-foreground">Client signature</p>
-                  <div className="mt-6 border-b border-border" />
+                  <p className="text-gray-400">Start Date</p>
+                  <p className="font-semibold">1 June 2026</p>
+                </div>
+                <div>
+                  <p className="text-gray-400">End Date</p>
+                  <p className="font-semibold">1 June 2027</p>
+                </div>
+                <div>
+                  <p className="text-gray-400">Value</p>
+                  <p className="font-semibold">KES 9,000.00</p>
+                </div>
+              </div>
+            </div>
+            <p className="mt-4 text-xs leading-relaxed text-gray-600">
+              Contract body text appears here with your company branding applied.
+            </p>
+            {settings.includeSignatureBlock ? (
+              <div className="mt-6 grid grid-cols-2 gap-6 border-t pt-4 text-xs">
+                <div>
+                  <p className="text-gray-400">Provider signature</p>
+                  <div className="mt-8 border-b border-gray-300" />
+                  <p className="mt-1 text-gray-500">{settings.companyName}</p>
+                </div>
+                <div>
+                  <p className="text-gray-400">Client signature</p>
+                  <div className="mt-8 border-b border-gray-300" />
+                  <p className="mt-1 text-gray-500">[Client Name]</p>
                 </div>
               </div>
             ) : null}
-            <p className="mt-4 text-xs text-muted-foreground">{settings.footerText}</p>
+            {settings.paymentDetails ? (
+              <div className="mt-4">
+                <p className="text-[10px] font-bold uppercase tracking-wider" style={{ color: settings.accentColor }}>
+                  Terms & Payment
+                </p>
+                <p className="mt-1 text-xs text-gray-500">{settings.paymentDetails}</p>
+              </div>
+            ) : null}
+            <p className="mt-4 text-center text-[10px] italic text-gray-400">{settings.footerText}</p>
           </div>
         </CardContent>
       </Card>

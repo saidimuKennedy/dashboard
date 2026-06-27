@@ -74,4 +74,9 @@ export const contractSettingsSchema = z.object({
   footerText: z.string(),
   includeSignatureBlock: z.boolean(),
   companyName: z.string(),
+  contactName: z.string(),
+  contactEmail: z.string(),
+  location: z.string(),
+  documentLabel: z.string(),
+  paymentDetails: z.string(),
 });
