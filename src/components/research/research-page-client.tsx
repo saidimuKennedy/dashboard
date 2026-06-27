@@ -55,9 +55,11 @@ export function ResearchPageClient() {
         if (json.success) {
           const data = json.data?.items ?? json.data ?? [];
           setItems(Array.isArray(data) ? data : []);
+        } else {
+          toast.error(json.message ?? "Failed to load research topics.");
         }
       })
-      .catch(() => {})
+      .catch(() => toast.error("Failed to load research topics."))
       .finally(() => setLoading(false));
   }, []);
 
