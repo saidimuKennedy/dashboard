@@ -24,11 +24,15 @@ import { formatChatTranscript, type ResearchChatMessage } from "@/types/research
 const DEFAULT_WELCOME =
   "Ask me about your business — revenue, risks, compliance, or recent meetings.";
 
+const MEETINGS_WELCOME =
+  "Ask about meeting outcomes, upcoming schedules, follow-ups, or whether a meeting achieved its goals.";
+
 const JOURNAL_WELCOME =
   "Tell me about your day — wins, challenges, lessons, and how you're feeling. I can turn this into a journal entry.";
 
 function getWelcomeMessage(pathname: string) {
   if (pathname.startsWith("/journal")) return JOURNAL_WELCOME;
+  if (pathname.startsWith("/meetings")) return MEETINGS_WELCOME;
   if (pathname.startsWith("/revenue")) {
     return "Ask about MRR, runway, forecast risks, or revenue trends. Customer names are masked.";
   }
@@ -37,6 +41,7 @@ function getWelcomeMessage(pathname: string) {
 
 function getPersona(pathname: string) {
   if (pathname.startsWith("/journal")) return "journal_assistant";
+  if (pathname.startsWith("/meetings")) return "meeting_assistant";
   if (pathname.startsWith("/revenue")) return "revenue_advisor";
   return "business_advisor";
 }

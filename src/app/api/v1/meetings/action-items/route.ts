@@ -14,7 +14,10 @@ export const POST = withAuth(async (request, { user }) => {
   if (!meeting) return notFound("Meeting not found.");
   const content = parsed.data.transcript ?? meeting.transcript ?? meeting.minutes ?? "";
   const result = await aiService.summarize(content, "action-items");
-  const items = result.response.split("\n").filter(Boolean).map((title) => ({ title, meetingId: parsed.data.meetingId, createdBy: user.id }));
+  const items = result.response.split("\n").filter(Boolean).map((title) => ({
+    title: title.replace(/^[-*•]\s*/, ""),
+    meetingId: parsed.data.meetingId,
+  }));
   if (items.length) await db.actionItem.createMany({ data: items });
   return success({ actionItems: items, summary: result.response });
 }, "ai.use");

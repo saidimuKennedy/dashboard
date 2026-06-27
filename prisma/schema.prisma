@@ -109,6 +109,32 @@ enum ContractStatus {
   TERMINATED
 }
 
+enum MeetingType {
+  VIRTUAL
+  IN_PERSON
+  HYBRID
+}
+
+enum MeetingStatus {
+  SCHEDULED
+  COMPLETED
+  CANCELLED
+  NO_SHOW
+}
+
+enum MeetingOutcome {
+  PENDING
+  SUCCESSFUL
+  PARTIAL
+  UNSUCCESSFUL
+}
+
+enum CalendarProvider {
+  GOOGLE
+  OUTLOOK
+  MANUAL
+}
+
 model User {
   id            String     @id @default(uuid())
   email         String     @unique
@@ -133,6 +159,8 @@ model User {
   auditLogs          AuditLog[]
   aiConversations    AiConversation[]
   notifications      Notification[]
+  calendarConnections CalendarConnection[]
+  reminders          Reminder[]
 
   @@map("users")
 }
@@ -330,29 +358,45 @@ model Idea {
 }
 
 model Meeting {
-  id          String    @id @default(uuid())
-  title       String
-  agenda      String?
-  minutes     String?
-  transcript  String?
-  aiSummary   String?   @map("ai_summary")
-  scheduledAt DateTime? @map("scheduled_at")
-  customerId  String?   @map("customer_id")
-  creatorId   String    @map("creator_id")
-  createdAt   DateTime  @default(now()) @map("created_at")
-  updatedAt   DateTime  @updatedAt @map("updated_at")
-  createdBy   String?   @map("created_by")
-  updatedBy   String?   @map("updated_by")
-  deletedAt   DateTime? @map("deleted_at")
-  version     Int       @default(1)
+  id                   String          @id @default(uuid())
+  title                String
+  agenda               String?
+  minutes              String?
+  transcript           String?
+  aiSummary            String?         @map("ai_summary")
+  aiEvaluation         String?         @map("ai_evaluation")
+  scheduledAt          DateTime?       @map("scheduled_at")
+  endsAt               DateTime?       @map("ends_at")
+  durationMinutes      Int?            @map("duration_minutes")
+  type                 MeetingType     @default(VIRTUAL)
+  status               MeetingStatus   @default(SCHEDULED)
+  meetingUrl           String?         @map("meeting_url")
+  location             String?
+  outcomeReport        String?         @map("outcome_report")
+  outcome              MeetingOutcome  @default(PENDING)
+  externalSource       String?         @map("external_source")
+  externalId           String?         @map("external_id")
+  externalParticipants Json?           @map("external_participants")
+  customerId           String?         @map("customer_id")
+  creatorId            String          @map("creator_id")
+  createdAt            DateTime        @default(now()) @map("created_at")
+  updatedAt            DateTime        @updatedAt @map("updated_at")
+  createdBy            String?         @map("created_by")
+  updatedBy            String?         @map("updated_by")
+  deletedAt            DateTime?       @map("deleted_at")
+  version              Int             @default(1)
 
   creator      User                 @relation("MeetingCreator", fields: [creatorId], references: [id])
   customer     Customer?            @relation(fields: [customerId], references: [id])
   participants MeetingParticipant[]
   actionItems  ActionItem[]
+  reminders    Reminder[]
 
+  @@unique([externalSource, externalId])
   @@index([creatorId])
   @@index([customerId])
+  @@index([scheduledAt])
+  @@index([status])
   @@map("meetings")
 }
 
@@ -869,12 +913,35 @@ model Reminder {
   dueAt       DateTime  @map("due_at")
   completed   Boolean   @default(false)
   userId      String?   @map("user_id")
+  meetingId   String?   @map("meeting_id")
   createdAt   DateTime  @default(now()) @map("created_at")
   updatedAt   DateTime  @updatedAt @map("updated_at")
   deletedAt   DateTime? @map("deleted_at")
 
+  user    User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  meeting Meeting? @relation(fields: [meetingId], references: [id], onDelete: Cascade)
+
   @@index([dueAt])
+  @@index([meetingId])
   @@map("reminders")
+}
+
+model CalendarConnection {
+  id           String           @id @default(uuid())
+  userId       String           @map("user_id")
+  provider     CalendarProvider
+  accessToken  String           @map("access_token")
+  refreshToken String?          @map("refresh_token")
+  expiresAt    DateTime?        @map("expires_at")
+  calendarId   String?          @map("calendar_id")
+  lastSyncedAt DateTime?        @map("last_synced_at")
+  createdAt    DateTime         @default(now()) @map("created_at")
+  updatedAt    DateTime         @updatedAt @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, provider])
+  @@map("calendar_connections")
 }
 
 model AuditLog {

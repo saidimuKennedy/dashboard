@@ -26,7 +26,7 @@ import {
 export type CreateField = {
   name: string;
   label: string;
-  type?: "text" | "textarea" | "number" | "select";
+  type?: "text" | "textarea" | "number" | "select" | "datetime-local";
   required?: boolean;
   placeholder?: string;
   options?: Array<{ value: string; label: string }>;
@@ -221,7 +221,13 @@ export function ModulePageClient({
               ) : (
                 <Input
                   id={`create-${field.name}`}
-                  type={field.type === "number" ? "number" : "text"}
+                  type={
+                    field.type === "number"
+                      ? "number"
+                      : field.type === "datetime-local"
+                        ? "datetime-local"
+                        : "text"
+                  }
                   placeholder={field.placeholder}
                   value={formValues[field.name] ?? ""}
                   onChange={(event) =>

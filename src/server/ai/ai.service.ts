@@ -3,6 +3,7 @@ import { getDeepSeekApiKey } from "@/lib/ai/deepseek";
 import { knowledgeRepository } from "@/server/repositories/knowledge.repository";
 import { analyzeResearchFromChat } from "@/server/ai/research-analysis";
 import { analyzeJournalFromChat } from "@/server/ai/journal-analysis";
+import { evaluateMeetingFromReport } from "@/server/ai/meeting-analysis";
 import {
   analyzeCustomerProfile,
   analyzeCustomerPortfolio,
@@ -38,7 +39,7 @@ const PROMPTS: Record<string, string> = {
   business_advisor: "You are a business advisor for Jiaminie Tech, an African software company. Provide evidence-based recommendations.",
   compliance_advisor: "You are a compliance advisor. Reference regulations including KRA, Kenya Data Protection Act, Meta and Google policies.",
   research_assistant: "You are a research assistant. Synthesize information and suggest next steps.",
-  meeting_assistant: "You are a meeting assistant. Summarize discussions and extract action items.",
+  meeting_assistant: "You are a meeting assistant for a founder. Summarize discussions, extract action items, and evaluate whether meetings achieved their goals based on agendas and outcome reports. Be direct about gaps, risks, and follow-ups.",
   revenue_advisor: "You are a revenue analyst. Analyze financial trends and provide forecasts.",
   founder_brief: "Generate a concise daily executive brief for the founder highlighting priorities, risks, and opportunities.",
   journal_assistant: "You are a founder journal coach. Help the founder reflect on their day — wins, challenges, lessons, and mood. Ask clarifying questions when useful and write in a warm, concise tone.",
@@ -100,6 +101,11 @@ export const aiService = {
     if (request.contextKey === "/revenue") {
       const { getRevenueFactsForAgent } = await import("@/lib/finance/reports");
       extraContext.push(await getRevenueFactsForAgent());
+    }
+
+    if (request.contextKey?.startsWith("/meetings")) {
+      const meetingContext = await buildMeetingChatContext(request.contextKey);
+      if (meetingContext) extraContext.push(meetingContext);
     }
 
     const contextBlock = [
@@ -233,4 +239,90 @@ export const aiService = {
     assertNoPii(maskedTerms, profile);
     return generateContractContent(callDeepSeek, maskedContext, maskedTerms, templateStyle);
   },
+
+  async evaluateMeeting(meeting: {
+    title: string;
+    agenda?: string | null;
+    outcomeReport?: string | null;
+    minutes?: string | null;
+    transcript?: string | null;
+    aiSummary?: string | null;
+    actionItems?: string[];
+  }) {
+    const { evaluation, tokens } = await evaluateMeetingFromReport(callDeepSeek, meeting);
+    return {
+      response: JSON.stringify(evaluation),
+      evaluation,
+      sources: [],
+      confidence: 0.9,
+      tokens,
+    };
+  },
 };
+
+async function buildMeetingChatContext(contextKey: string): Promise<string | null> {
+  const parts = contextKey.split("/").filter(Boolean);
+  if (parts[0] !== "meetings") return null;
+
+  if (parts[1]) {
+    const meeting = await db.meeting.findFirst({
+      where: { id: parts[1], deletedAt: null },
+      include: {
+        customer: { select: { name: true } },
+        actionItems: { where: { deletedAt: null } },
+      },
+    });
+    if (!meeting) return null;
+
+    return [
+      `Meeting: ${meeting.title}`,
+      meeting.scheduledAt ? `Scheduled: ${meeting.scheduledAt.toISOString()}` : "",
+      meeting.type ? `Type: ${meeting.type}` : "",
+      meeting.status ? `Status: ${meeting.status}` : "",
+      meeting.outcome ? `Outcome: ${meeting.outcome}` : "",
+      meeting.customer ? `Customer: ${meeting.customer.name}` : "",
+      meeting.agenda ? `Agenda:\n${meeting.agenda}` : "",
+      meeting.outcomeReport ? `Outcome report:\n${meeting.outcomeReport}` : "",
+      meeting.minutes ? `Minutes:\n${meeting.minutes}` : "",
+      meeting.aiSummary ? `AI summary:\n${meeting.aiSummary}` : "",
+      meeting.aiEvaluation ? `AI evaluation:\n${meeting.aiEvaluation}` : "",
+      meeting.actionItems.length
+        ? `Action items:\n${meeting.actionItems.map((a) => `- ${a.title}${a.completed ? " (done)" : ""}`).join("\n")}`
+        : "",
+    ]
+      .filter(Boolean)
+      .join("\n");
+  }
+
+  const upcoming = await db.meeting.findMany({
+    where: { deletedAt: null, status: "SCHEDULED", scheduledAt: { gte: new Date() } },
+    take: 5,
+    orderBy: { scheduledAt: "asc" },
+    select: { title: true, scheduledAt: true, type: true, outcome: true },
+  });
+
+  const recent = await db.meeting.findMany({
+    where: { deletedAt: null, status: "COMPLETED" },
+    take: 5,
+    orderBy: { scheduledAt: "desc" },
+    select: { title: true, scheduledAt: true, outcome: true, aiSummary: true },
+  });
+
+  return [
+    "Upcoming meetings:",
+    upcoming.length
+      ? upcoming
+          .map((m) => `- ${m.title} (${m.scheduledAt?.toISOString() ?? "unscheduled"}, ${m.type})`)
+          .join("\n")
+      : "None scheduled.",
+    "Recent completed meetings:",
+    recent.length
+      ? recent
+          .map(
+            (m) =>
+              `- ${m.title} (${m.outcome})${m.aiSummary ? `: ${m.aiSummary.slice(0, 120)}` : ""}`
+          )
+          .join("\n")
+      : "None completed yet.",
+  ].join("\n\n");
+}

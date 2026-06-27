@@ -1,60 +1,7 @@
 import { db } from "@/lib/db";
 import { DecisionStatus, Prisma, RiskCategory, RiskLevel } from "@prisma/client";
 
-export const meetingRepository = {
-  async list(skip: number, take: number) {
-    const where = { deletedAt: null };
-    const [items, total] = await Promise.all([
-      db.meeting.findMany({
-        where,
-        skip,
-        take,
-        orderBy: { createdAt: "desc" },
-        include: {
-          creator: { select: { id: true, firstName: true, lastName: true } },
-          customer: { select: { id: true, name: true } },
-          actionItems: true,
-        },
-      }),
-      db.meeting.count({ where }),
-    ]);
-    return { items, total };
-  },
-
-  async getById(id: string) {
-    return db.meeting.findFirst({
-      where: { id, deletedAt: null },
-      include: {
-        creator: true,
-        customer: true,
-        participants: { include: { user: true } },
-        actionItems: true,
-      },
-    });
-  },
-
-  async create(data: {
-    title: string;
-    agenda?: string;
-    minutes?: string;
-    creatorId: string;
-    customerId?: string;
-    scheduledAt?: Date;
-  }) {
-    return db.meeting.create({
-      data: { ...data, createdBy: data.creatorId },
-      include: { actionItems: true },
-    });
-  },
-
-  async update(id: string, data: Partial<{ title: string; agenda: string; minutes: string; transcript: string; aiSummary: string }>, userId: string) {
-    return db.meeting.update({ where: { id }, data: { ...data, updatedBy: userId } });
-  },
-
-  async softDelete(id: string, userId: string) {
-    return db.meeting.update({ where: { id }, data: { deletedAt: new Date(), updatedBy: userId } });
-  },
-};
+export { meetingRepository } from "@/server/repositories/meeting.repository";
 
 export const decisionRepository = {
   async list(skip: number, take: number) {

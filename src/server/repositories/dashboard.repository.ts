@@ -3,7 +3,8 @@ import { getDeepSeekApiKey } from "@/lib/ai/deepseek";
 import { Prisma, ResearchStage } from "@prisma/client";
 
 export const dashboardRepository = {
-  async getOverview() {
+  async getOverview(userId: string) {
+    const now = new Date();
     const [
       articleCount,
       customerCount,
@@ -11,6 +12,8 @@ export const dashboardRepository = {
       complianceAtRisk,
       openRisks,
       recentMeetings,
+      upcomingMeetings,
+      meetingReminders,
       recentJournal,
       notifications,
     ] = await Promise.all([
@@ -20,10 +23,55 @@ export const dashboardRepository = {
       db.complianceItem.count({ where: { deletedAt: null, status: { in: ["AT_RISK", "NON_COMPLIANT"] } } }),
       db.risk.count({ where: { deletedAt: null, level: { in: ["HIGH", "CRITICAL"] } } }),
       db.meeting.findMany({
-        where: { deletedAt: null },
+        where: { deletedAt: null, status: "COMPLETED" },
         take: 5,
-        orderBy: { createdAt: "desc" },
-        select: { id: true, title: true, scheduledAt: true, aiSummary: true },
+        orderBy: { scheduledAt: "desc" },
+        select: {
+          id: true,
+          title: true,
+          scheduledAt: true,
+          aiSummary: true,
+          outcome: true,
+          type: true,
+          meetingUrl: true,
+        },
+      }),
+      db.meeting.findMany({
+        where: {
+          deletedAt: null,
+          status: "SCHEDULED",
+          scheduledAt: { gte: now },
+        },
+        take: 5,
+        orderBy: { scheduledAt: "asc" },
+        select: {
+          id: true,
+          title: true,
+          scheduledAt: true,
+          endsAt: true,
+          type: true,
+          meetingUrl: true,
+          location: true,
+          customer: { select: { id: true, name: true } },
+        },
+      }),
+      db.reminder.findMany({
+        where: {
+          deletedAt: null,
+          completed: false,
+          userId,
+          meetingId: { not: null },
+          dueAt: { gte: now },
+        },
+        take: 5,
+        orderBy: { dueAt: "asc" },
+        select: {
+          id: true,
+          title: true,
+          dueAt: true,
+          meetingId: true,
+          meeting: { select: { id: true, title: true, scheduledAt: true, meetingUrl: true } },
+        },
       }),
       db.journalEntry.findMany({
         where: { deletedAt: null },
@@ -32,7 +80,7 @@ export const dashboardRepository = {
         select: { id: true, date: true, content: true, aiSummary: true },
       }),
       db.notification.findMany({
-        where: { read: false },
+        where: { userId, read: false },
         take: 10,
         orderBy: { createdAt: "desc" },
       }),
@@ -70,6 +118,8 @@ export const dashboardRepository = {
     return {
       kpis,
       recentMeetings,
+      upcomingMeetings,
+      meetingReminders,
       recentJournal,
       notifications,
       aiBrief,

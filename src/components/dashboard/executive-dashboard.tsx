@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import {
   BookOpen,
   Users,
@@ -12,6 +13,7 @@ import {
 import { MetricCard } from "@/components/dashboard/metric-card";
 import { AiBriefCard } from "@/components/dashboard/ai-brief-card";
 import { RecentActivity } from "@/components/dashboard/recent-activity";
+import { UpcomingMeetings } from "@/components/dashboard/upcoming-meetings";
 import { formatCurrency, formatCurrencyCompact } from "@/lib/utils";
 
 interface DashboardData {
@@ -24,11 +26,40 @@ interface DashboardData {
     highRisks: number;
   };
   aiBrief: string;
-  recentMeetings: Array<{ id: string; title: string; scheduledAt?: string; aiSummary?: string }>;
+  recentMeetings: Array<{
+    id: string;
+    title: string;
+    scheduledAt?: string;
+    aiSummary?: string;
+    outcome?: string;
+  }>;
+  upcomingMeetings: Array<{
+    id: string;
+    title: string;
+    scheduledAt?: string | null;
+    endsAt?: string | null;
+    type?: string;
+    meetingUrl?: string | null;
+    location?: string | null;
+    customer?: { id: string; name: string } | null;
+  }>;
+  meetingReminders: Array<{
+    id: string;
+    title: string;
+    dueAt: string;
+    meetingId?: string | null;
+    meeting?: {
+      id: string;
+      title: string;
+      scheduledAt?: string | null;
+      meetingUrl?: string | null;
+    } | null;
+  }>;
   recentJournal: Array<{ id: string; date: string; content: string; aiSummary?: string }>;
 }
 
 export function ExecutiveDashboard() {
+  const router = useRouter();
   const [data, setData] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -92,6 +123,13 @@ export function ExecutiveDashboard() {
 
       <AiBriefCard brief={data?.aiBrief} loading={loading} />
 
+      <UpcomingMeetings
+        meetings={data?.upcomingMeetings}
+        reminders={data?.meetingReminders}
+        loading={loading}
+        onOpenMeeting={(id) => router.push(`/meetings?open=${id}`)}
+      />
+
       <div className="grid gap-4 lg:grid-cols-2">
         <RecentActivity
           title="Recent Meetings"
@@ -102,7 +140,7 @@ export function ExecutiveDashboard() {
             subtitle: m.aiSummary,
             date: m.scheduledAt,
           }))}
-          emptyMessage="No meetings recorded yet."
+          emptyMessage="No completed meetings yet."
         />
         <RecentActivity
           title="Founder Journal"

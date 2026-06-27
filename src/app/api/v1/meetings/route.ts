@@ -8,6 +8,12 @@ import { meetingRepository } from "@/server/repositories/domains.repository";
 import { auditLog } from "@/lib/logger/audit";
 
 export const GET = withAuth(async (request) => {
+  const view = request.nextUrl.searchParams.get("view");
+  if (view === "upcoming") {
+    const items = await meetingRepository.listUpcoming(20);
+    return success(items);
+  }
+
   const { page, limit, skip } = parsePagination(request.nextUrl.searchParams);
   const { items, total } = await meetingRepository.list(skip, limit);
   return success(paginatedData(items, total, page, limit));

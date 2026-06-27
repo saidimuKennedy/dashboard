@@ -21,6 +21,21 @@ export const journalCreateFields: CreateField[] = [
 
 export const meetingsCreateFields: CreateField[] = [
   { name: "title", label: "Title", required: true, placeholder: "Meeting title" },
+  { name: "scheduledAt", label: "Scheduled", type: "datetime-local", placeholder: "" },
+  { name: "durationMinutes", label: "Duration (minutes)", type: "number", placeholder: "60" },
+  {
+    name: "type",
+    label: "Type",
+    type: "select",
+    options: [
+      { value: "VIRTUAL", label: "Virtual" },
+      { value: "IN_PERSON", label: "In person" },
+      { value: "HYBRID", label: "Hybrid" },
+    ],
+  },
+  { name: "meetingUrl", label: "Join URL", placeholder: "https://zoom.us/j/... or meet.google.com/..." },
+  { name: "location", label: "Location", placeholder: "Office, café, or address (in-person)" },
+  { name: "customerId", label: "Customer ID", placeholder: "Optional customer UUID" },
   { name: "agenda", label: "Agenda", type: "textarea", placeholder: "Topics to cover" },
 ];
 
