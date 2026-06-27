@@ -97,6 +97,18 @@ export function ModulePageClient({
     fetchItems();
   }, [fetchItems]);
 
+  useEffect(() => {
+    function handleModuleUpdated() {
+      fetchItems();
+    }
+    window.addEventListener("research:updated", handleModuleUpdated);
+    window.addEventListener("journal:updated", handleModuleUpdated);
+    return () => {
+      window.removeEventListener("research:updated", handleModuleUpdated);
+      window.removeEventListener("journal:updated", handleModuleUpdated);
+    };
+  }, [fetchItems]);
+
   function openCreateForm() {
     setFormValues({});
     setCreating(true);

@@ -21,3 +21,12 @@ export const journalReflectSchema = z.object({
   id: z.string().uuid().optional(),
   content: z.string().min(1).optional(),
 }).refine((d) => d.id || d.content, { message: "Either id or content is required." });
+
+export const journalFromChatSchema = z.object({
+  messages: z.array(
+    z.object({
+      role: z.enum(["user", "assistant"]),
+      content: z.string().min(1),
+    })
+  ).min(1),
+});

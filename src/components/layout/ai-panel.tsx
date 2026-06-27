@@ -1,8 +1,16 @@
 "use client";
 
-import { useState } from "react";
-import { useRouter } from "next/navigation";
-import { ChevronLeft, ChevronRight, Copy, FlaskConical, Send, Sparkles } from "lucide-react";
+import { useEffect, useState } from "react";
+import { usePathname, useRouter } from "next/navigation";
+import {
+  BookOpen,
+  ChevronLeft,
+  ChevronRight,
+  Copy,
+  FlaskConical,
+  Send,
+  Sparkles,
+} from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -16,30 +24,49 @@ interface Message {
   content: string;
 }
 
-const WELCOME_MESSAGE =
+const DEFAULT_WELCOME =
   "Ask me about your business — revenue, risks, compliance, or recent meetings.";
 
-function getExportableMessages(messages: Message[]): ResearchChatMessage[] {
+const JOURNAL_WELCOME =
+  "Tell me about your day — wins, challenges, lessons, and how you're feeling. I can turn this into a journal entry.";
+
+function getWelcomeMessage(pathname: string) {
+  return pathname.startsWith("/journal") ? JOURNAL_WELCOME : DEFAULT_WELCOME;
+}
+
+function getExportableMessages(messages: Message[], welcomeMessage: string): ResearchChatMessage[] {
   return messages.filter(
-    (message) => !(message.role === "assistant" && message.content === WELCOME_MESSAGE)
+    (message) => !(message.role === "assistant" && message.content === welcomeMessage)
   );
 }
 
 export function AiPanel() {
   const router = useRouter();
+  const pathname = usePathname();
+  const welcomeMessage = getWelcomeMessage(pathname);
+  const isJournalPage = pathname.startsWith("/journal");
+  const persona = isJournalPage ? "journal_assistant" : "business_advisor";
+
   const [open, setOpen] = useState(true);
   const [input, setInput] = useState("");
   const [messages, setMessages] = useState<Message[]>([
-    {
-      role: "assistant",
-      content: WELCOME_MESSAGE,
-    },
+    { role: "assistant", content: welcomeMessage },
   ]);
   const [loading, setLoading] = useState(false);
-  const [exporting, setExporting] = useState(false);
+  const [exportingResearch, setExportingResearch] = useState(false);
+  const [exportingJournal, setExportingJournal] = useState(false);
   const { pushMessage, onInputChange, handleHistoryKeyDown } = useMessageHistory();
 
-  const exportableMessages = getExportableMessages(messages);
+  useEffect(() => {
+    setMessages((prev) => {
+      if (prev.length === 1 && prev[0].role === "assistant") {
+        return [{ role: "assistant", content: welcomeMessage }];
+      }
+      return prev;
+    });
+  }, [welcomeMessage]);
+
+  const exportableMessages = getExportableMessages(messages, welcomeMessage);
   const canExport =
     exportableMessages.some((message) => message.role === "user") &&
     exportableMessages.some((message) => message.role === "assistant");
@@ -57,7 +84,7 @@ export function AiPanel() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
-        body: JSON.stringify({ prompt: userMessage, persona: "business_advisor" }),
+        body: JSON.stringify({ prompt: userMessage, persona }),
       });
       const json = await res.json();
       if (!res.ok || !json.success) {
@@ -102,7 +129,7 @@ export function AiPanel() {
       return;
     }
 
-    setExporting(true);
+    setExportingResearch(true);
     try {
       const response = await fetch("/api/v1/research/from-chat", {
         method: "POST",
@@ -126,7 +153,41 @@ export function AiPanel() {
     } catch {
       toast.error("Failed to export research item.");
     } finally {
-      setExporting(false);
+      setExportingResearch(false);
+    }
+  }
+
+  async function exportToJournal() {
+    if (!canExport) {
+      toast.error("Chat with the AI about your day before exporting.");
+      return;
+    }
+
+    setExportingJournal(true);
+    try {
+      const response = await fetch("/api/v1/journal/from-chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ messages: exportableMessages }),
+      });
+      const json = await response.json();
+      if (!json.success) {
+        toast.error(json.message ?? "Failed to export journal entry.");
+        return;
+      }
+
+      window.dispatchEvent(new CustomEvent("journal:updated"));
+      toast.success("Saved to Journal", {
+        description: "Your reflection was structured into a journal entry.",
+        action: {
+          label: "View",
+          onClick: () => router.push("/journal"),
+        },
+      });
+    } catch {
+      toast.error("Failed to export journal entry.");
+    } finally {
+      setExportingJournal(false);
     }
   }
 
@@ -155,7 +216,9 @@ export function AiPanel() {
             <Sparkles className="h-4 w-4 text-primary" />
             <div>
               <p className="text-sm font-semibold">AI Assistant</p>
-              <p className="text-[10px] text-muted-foreground">Context-aware insights</p>
+              <p className="text-[10px] text-muted-foreground">
+                {isJournalPage ? "Journal coach" : "Context-aware insights"}
+              </p>
             </div>
           </div>
           <div className="flex items-center gap-1">
@@ -173,8 +236,18 @@ export function AiPanel() {
               variant="ghost"
               size="icon"
               className="h-8 w-8"
+              onClick={exportToJournal}
+              disabled={!canExport || exportingJournal}
+              title="Save as journal entry"
+            >
+              <BookOpen className="h-3.5 w-3.5" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-8 w-8"
               onClick={exportToResearch}
-              disabled={!canExport || exporting}
+              disabled={!canExport || exportingResearch}
               title="Export as research item"
             >
               <FlaskConical className="h-3.5 w-3.5" />
@@ -194,7 +267,7 @@ export function AiPanel() {
               )}
             >
               <AiMessageContent content={msg.content} role={msg.role} />
-              {msg.content !== WELCOME_MESSAGE ? (
+              {msg.content !== welcomeMessage ? (
                 <button
                   type="button"
                   onClick={() => copyMessage(msg.content)}
@@ -215,16 +288,30 @@ export function AiPanel() {
 
         <div className="space-y-2 border-t border-border p-3">
           {canExport ? (
-            <Button
-              variant="outline"
-              size="sm"
-              className="w-full"
-              onClick={exportToResearch}
-              loading={exporting}
-            >
-              <FlaskConical className="h-3.5 w-3.5" />
-              Export as research item
-            </Button>
+            <div className="grid gap-2">
+              <Button
+                variant={isJournalPage ? "default" : "outline"}
+                size="sm"
+                className="w-full"
+                onClick={exportToJournal}
+                loading={exportingJournal}
+              >
+                <BookOpen className="h-3.5 w-3.5" />
+                Save as journal entry
+              </Button>
+              {!isJournalPage ? (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="w-full"
+                  onClick={exportToResearch}
+                  loading={exportingResearch}
+                >
+                  <FlaskConical className="h-3.5 w-3.5" />
+                  Export as research item
+                </Button>
+              ) : null}
+            </div>
           ) : null}
           <div className="flex gap-2">
             <Textarea
@@ -237,7 +324,7 @@ export function AiPanel() {
                   handleSend();
                 }
               }}
-              placeholder="Ask JIP anything…"
+              placeholder={isJournalPage ? "Reflect on your day…" : "Ask JIP anything…"}
               rows={2}
               className="min-h-0 resize-none text-sm"
             />

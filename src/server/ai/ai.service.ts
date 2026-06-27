@@ -2,6 +2,7 @@ import { db } from "@/lib/db";
 import { getDeepSeekApiKey } from "@/lib/ai/deepseek";
 import { knowledgeRepository } from "@/server/repositories/knowledge.repository";
 import { analyzeResearchFromChat } from "@/server/ai/research-analysis";
+import { analyzeJournalFromChat } from "@/server/ai/journal-analysis";
 import type { ResearchChatMessage } from "@/types/research";
 
 export type AiRequest = {
@@ -25,6 +26,7 @@ const PROMPTS: Record<string, string> = {
   meeting_assistant: "You are a meeting assistant. Summarize discussions and extract action items.",
   revenue_advisor: "You are a revenue analyst. Analyze financial trends and provide forecasts.",
   founder_brief: "Generate a concise daily executive brief for the founder highlighting priorities, risks, and opportunities.",
+  journal_assistant: "You are a founder journal coach. Help the founder reflect on their day — wins, challenges, lessons, and mood. Ask clarifying questions when useful and write in a warm, concise tone.",
 };
 
 async function retrieveContext(query: string, limit = 5) {
@@ -147,5 +149,9 @@ export const aiService = {
 
   async analyzeResearchChat(messages: ResearchChatMessage[]) {
     return analyzeResearchFromChat(callDeepSeek, messages);
+  },
+
+  async analyzeJournalChat(messages: ResearchChatMessage[]) {
+    return analyzeJournalFromChat(callDeepSeek, messages);
   },
 };

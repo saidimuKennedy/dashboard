@@ -10,7 +10,7 @@ export default function JournalPage() {
       endpoint="/api/v1/journal"
       columns={["Date", "Mood", "Updated", "Author"]}
       emptyTitle="No journal entries"
-      emptyDescription="Capture your daily reflections and track your founder journey."
+      emptyDescription="Chat with the AI about your day, then click Save as journal entry — or create one manually."
       createFields={journalCreateFields}
     />
   );
