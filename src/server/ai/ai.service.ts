@@ -1,6 +1,8 @@
 import { db } from "@/lib/db";
 import { getDeepSeekApiKey } from "@/lib/ai/deepseek";
 import { knowledgeRepository } from "@/server/repositories/knowledge.repository";
+import { analyzeResearchFromChat } from "@/server/ai/research-analysis";
+import type { ResearchChatMessage } from "@/types/research";
 
 export type AiRequest = {
   prompt: string;
@@ -141,5 +143,9 @@ export const aiService = {
 
   async searchSemantic(query: string) {
     return retrieveContext(query, 10);
+  },
+
+  async analyzeResearchChat(messages: ResearchChatMessage[]) {
+    return analyzeResearchFromChat(callDeepSeek, messages);
   },
 };

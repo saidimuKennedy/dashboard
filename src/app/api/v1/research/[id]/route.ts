@@ -7,6 +7,12 @@ import { researchRepository } from "@/server/repositories/dashboard.repository";
 import { auditLog } from "@/lib/logger/audit";
 import { db } from "@/lib/db";
 
+export const GET = withAuth(async (_request, { params }) => {
+  const topic = await researchRepository.getById(params!.id);
+  if (!topic) return notFound("Research topic not found.");
+  return success(topic);
+}, "knowledge.read");
+
 export const PATCH = withAuth(async (request, { user, params }) => {
   const parsed = await parseBody(request, updateResearchSchema);
   if (!parsed.ok) return parsed.response;

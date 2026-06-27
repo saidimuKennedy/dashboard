@@ -23,3 +23,13 @@ export const researchActionSchema = z.object({
 export const researchSummarizeSchema = z.object({
   id: z.string().uuid(),
 });
+
+export const researchChatMessageSchema = z.object({
+  role: z.enum(["user", "assistant"]),
+  content: z.string().min(1),
+});
+
+export const researchFromChatSchema = z.object({
+  messages: z.array(researchChatMessageSchema).min(1),
+  title: z.string().min(1).optional(),
+});

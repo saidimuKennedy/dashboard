@@ -1,17 +1,18 @@
-import { ModulePageClient } from "@/components/dashboard/module-page-client";
-import { researchCreateFields } from "@/config/module-create-fields";
+import { Suspense } from "react";
+import { ResearchPageClient } from "@/components/research/research-page-client";
+import { Skeleton } from "@/components/ui/skeleton";
 
 export default function ResearchPage() {
   return (
-    <ModulePageClient
-      title="Research"
-      description="Track market research, competitive analysis, and product discovery."
-      ctaLabel="New Research Topic"
-      endpoint="/api/v1/research"
-      columns={["Title", "Stage", "Updated", "Author"]}
-      emptyTitle="No research topics"
-      emptyDescription="Start tracking research to inform product and market decisions."
-      createFields={researchCreateFields}
-    />
+    <Suspense
+      fallback={
+        <div className="space-y-4">
+          <Skeleton className="h-8 w-48" />
+          <Skeleton className="h-40 w-full" />
+        </div>
+      }
+    >
+      <ResearchPageClient />
+    </Suspense>
   );
 }

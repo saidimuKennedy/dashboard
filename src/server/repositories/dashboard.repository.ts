@@ -194,8 +194,25 @@ export const researchRepository = {
     return { items, total };
   },
 
-  async create(data: { title: string; description?: string; authorId: string; productId?: string; stage?: ResearchStage }) {
+  async create(data: {
+    title: string;
+    description?: string;
+    authorId: string;
+    productId?: string;
+    stage?: ResearchStage;
+    notes?: string;
+    summary?: string;
+    sourceChat?: Prisma.InputJsonValue;
+    aiAnalysis?: Prisma.InputJsonValue;
+  }) {
     return db.researchTopic.create({ data: { ...data, createdBy: data.authorId } });
+  },
+
+  async getById(id: string) {
+    return db.researchTopic.findFirst({
+      where: { id, deletedAt: null },
+      include: { author: true, product: true, tags: { include: { tag: true } } },
+    });
   },
 
   async update(

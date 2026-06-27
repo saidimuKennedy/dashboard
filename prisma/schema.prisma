@@ -377,7 +377,10 @@ model ResearchTopic {
   stage       ResearchStage @default(IDEA)
   authorId    String        @map("author_id")
   productId   String?       @map("product_id")
-  notes       String?
+  notes       String?       @db.Text
+  summary     String?       @db.Text
+  sourceChat  Json?         @map("source_chat")
+  aiAnalysis  Json?         @map("ai_analysis")
   createdAt   DateTime      @default(now()) @map("created_at")
   updatedAt   DateTime      @updatedAt @map("updated_at")
   createdBy   String?       @map("created_by")
