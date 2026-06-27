@@ -38,16 +38,17 @@ async function main() {
   });
 
   const products = await Promise.all(
-    ["JChats", "CRM", "POS", "Socials"].map((name) =>
-      prisma.product.upsert({
-        where: { slug: name.toLowerCase() },
-        update: {},
-        create: {
-          name,
-          slug: name.toLowerCase(),
-          description: `${name} product by Jiaminie Tech`,
-        },
-      })
+    ["JChats", "CRM", "POS", "Socials", "WhatsApp Commerce", "Web Development", "Support & Maintenance"].map(
+      (name) =>
+        prisma.product.upsert({
+          where: { slug: name.toLowerCase().replace(/\s+/g, "-").replace(/&/g, "") },
+          update: {},
+          create: {
+            name,
+            slug: name.toLowerCase().replace(/\s+/g, "-").replace(/&/g, ""),
+            description: `${name} product by Jiaminie Tech`,
+          },
+        })
     )
   );
 

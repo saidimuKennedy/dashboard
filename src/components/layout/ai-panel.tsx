@@ -28,7 +28,17 @@ const JOURNAL_WELCOME =
   "Tell me about your day — wins, challenges, lessons, and how you're feeling. I can turn this into a journal entry.";
 
 function getWelcomeMessage(pathname: string) {
-  return pathname.startsWith("/journal") ? JOURNAL_WELCOME : DEFAULT_WELCOME;
+  if (pathname.startsWith("/journal")) return JOURNAL_WELCOME;
+  if (pathname.startsWith("/revenue")) {
+    return "Ask about MRR, runway, forecast risks, or revenue trends. Customer names are masked.";
+  }
+  return DEFAULT_WELCOME;
+}
+
+function getPersona(pathname: string) {
+  if (pathname.startsWith("/journal")) return "journal_assistant";
+  if (pathname.startsWith("/revenue")) return "revenue_advisor";
+  return "business_advisor";
 }
 
 function getExportableMessages(
@@ -45,7 +55,8 @@ function AiPanelInner() {
   const pathname = usePathname();
   const welcomeMessage = getWelcomeMessage(pathname);
   const isJournalPage = pathname.startsWith("/journal");
-  const persona = isJournalPage ? "journal_assistant" : "business_advisor";
+  const isRevenuePage = pathname.startsWith("/revenue");
+  const persona = getPersona(pathname);
   const contextKey = pathname;
 
   const [open, setOpen] = useState(true);
@@ -194,7 +205,11 @@ function AiPanelInner() {
             <div>
               <p className="text-sm font-semibold">AI Assistant</p>
               <p className="text-[10px] text-muted-foreground">
-                {isJournalPage ? "Journal coach" : "Context-aware insights"}
+                {isJournalPage
+                  ? "Journal coach"
+                  : isRevenuePage
+                    ? "Revenue advisor"
+                    : "Context-aware insights"}
               </p>
             </div>
           </div>

@@ -95,8 +95,15 @@ export const aiService = {
     const persona = request.persona ?? "business_advisor";
     const systemPrompt = PROMPTS[persona] ?? PROMPTS.business_advisor;
     const sources = await retrieveContext(request.prompt);
+    const extraContext: string[] = [...(request.context ?? [])];
+
+    if (request.contextKey === "/revenue") {
+      const { getRevenueFactsForAgent } = await import("@/lib/finance/reports");
+      extraContext.push(await getRevenueFactsForAgent());
+    }
+
     const contextBlock = [
-      ...(request.context ?? []),
+      ...extraContext,
       ...sources.map((s) => `[${s.title}]: ${s.excerpt}`),
     ].join("\n");
 
