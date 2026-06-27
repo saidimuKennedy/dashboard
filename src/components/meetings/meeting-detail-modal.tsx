@@ -7,7 +7,6 @@ import {
   CheckCircle2,
   Copy,
   Gavel,
-  MapPin,
   Sparkles,
   Video,
   X,
@@ -22,12 +21,18 @@ import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
 import {
   MEETING_OUTCOME_LABELS,
+  MEETING_OUTCOME_OPTIONS,
   MEETING_STATUS_LABELS,
+  MEETING_STATUS_OPTIONS,
   MEETING_TYPE_LABELS,
+  MEETING_TYPE_OPTIONS,
   parseMeetingEvaluation,
+  toDatetimeLocalValue,
   type MeetingDetail,
   type MeetingEvaluation,
 } from "@/types/meeting";
+
+type CustomerOption = { id: string; name: string };
 
 interface MeetingDetailModalProps {
   meetingId: string | null;
@@ -54,13 +59,20 @@ export function MeetingDetailModal({ meetingId, onClose }: MeetingDetailModalPro
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [aiLoading, setAiLoading] = useState<"summary" | "actions" | "evaluate" | "decisions" | null>(null);
+  const [customers, setCustomers] = useState<CustomerOption[]>([]);
   const [draft, setDraft] = useState({
+    title: "",
+    scheduledAt: "",
+    durationMinutes: "",
+    type: "VIRTUAL",
+    customerId: "",
+    status: "SCHEDULED",
+    outcome: "PENDING",
+    meetingUrl: "",
+    location: "",
     agenda: "",
     minutes: "",
     outcomeReport: "",
-    meetingUrl: "",
-    location: "",
-    status: "SCHEDULED",
   });
   const [evaluation, setEvaluation] = useState<MeetingEvaluation | null>(null);
 
@@ -82,12 +94,18 @@ export function MeetingDetailModal({ meetingId, onClose }: MeetingDetailModalPro
             : null,
         } as MeetingDetail);
         setDraft({
+          title: data.title,
+          scheduledAt: toDatetimeLocalValue(data.scheduledAt),
+          durationMinutes: data.durationMinutes?.toString() ?? "",
+          type: data.type,
+          customerId: data.customerId ?? data.customer?.id ?? "",
+          status: data.status,
+          outcome: data.outcome,
           agenda: data.agenda ?? "",
           minutes: data.minutes ?? "",
           outcomeReport: data.outcomeReport ?? "",
           meetingUrl: data.meetingUrl ?? "",
           location: data.location ?? "",
-          status: data.status,
         });
         setEvaluation(parseMeetingEvaluation(data.aiEvaluation));
       })
@@ -102,6 +120,21 @@ export function MeetingDetailModal({ meetingId, onClose }: MeetingDetailModalPro
       return;
     }
     fetchMeeting();
+    fetch("/api/v1/customers")
+      .then((res) => res.json())
+      .then((json) => {
+        if (!json.success) return;
+        const customerItems = json.data?.items ?? json.data ?? [];
+        setCustomers(
+          Array.isArray(customerItems)
+            ? customerItems.map((c: { id: string; name: string }) => ({
+                id: c.id,
+                name: c.name,
+              }))
+            : []
+        );
+      })
+      .catch(() => {});
   }, [meetingId, fetchMeeting]);
 
   if (!meetingId) return null;
@@ -114,12 +147,18 @@ export function MeetingDetailModal({ meetingId, onClose }: MeetingDetailModalPro
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
+          title: draft.title.trim(),
+          scheduledAt: draft.scheduledAt || null,
+          durationMinutes: draft.durationMinutes ? Number(draft.durationMinutes) : null,
+          type: draft.type,
+          customerId: draft.customerId || null,
+          status: draft.status,
+          outcome: draft.outcome,
           agenda: draft.agenda || null,
           minutes: draft.minutes || null,
           outcomeReport: draft.outcomeReport || null,
           meetingUrl: draft.meetingUrl || null,
           location: draft.location || null,
-          status: draft.status,
         }),
       });
       const json = await response.json();
@@ -230,9 +269,14 @@ export function MeetingDetailModal({ meetingId, onClose }: MeetingDetailModalPro
     toast.success("Join URL copied.");
   }
 
-  const scheduledLabel = meeting?.scheduledAt
-    ? new Date(meeting.scheduledAt).toLocaleString()
-    : "Not scheduled";
+  const scheduledLabel = draft.scheduledAt
+    ? new Date(draft.scheduledAt).toLocaleString()
+    : meeting?.scheduledAt
+      ? new Date(meeting.scheduledAt).toLocaleString()
+      : "Not scheduled";
+
+  const selectedCustomer =
+    customers.find((c) => c.id === draft.customerId) ?? meeting?.customer ?? null;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
@@ -251,25 +295,27 @@ export function MeetingDetailModal({ meetingId, onClose }: MeetingDetailModalPro
               <>
                 <div className="flex flex-wrap items-center gap-2">
                   <Calendar className="h-4 w-4 text-primary" />
-                  <h2 className="truncate text-lg font-semibold">{meeting?.title ?? "Meeting"}</h2>
-                  {meeting?.status ? (
-                    <Badge className={cn("capitalize", statusStyles[meeting.status])}>
-                      {MEETING_STATUS_LABELS[meeting.status]}
+                  <h2 className="truncate text-lg font-semibold">{draft.title || meeting?.title || "Meeting"}</h2>
+                  {draft.status || meeting?.status ? (
+                    <Badge className={cn("capitalize", statusStyles[draft.status || meeting!.status])}>
+                      {MEETING_STATUS_LABELS[(draft.status || meeting!.status) as keyof typeof MEETING_STATUS_LABELS]}
                     </Badge>
                   ) : null}
-                  {meeting?.type ? (
-                    <Badge variant="secondary">{MEETING_TYPE_LABELS[meeting.type]}</Badge>
+                  {draft.type || meeting?.type ? (
+                    <Badge variant="secondary">
+                      {MEETING_TYPE_LABELS[(draft.type || meeting!.type) as keyof typeof MEETING_TYPE_LABELS]}
+                    </Badge>
                   ) : null}
-                  {meeting?.outcome ? (
-                    <Badge className={cn(outcomeStyles[meeting.outcome])}>
-                      {MEETING_OUTCOME_LABELS[meeting.outcome]}
+                  {draft.outcome || meeting?.outcome ? (
+                    <Badge className={cn(outcomeStyles[draft.outcome || meeting!.outcome])}>
+                      {MEETING_OUTCOME_LABELS[(draft.outcome || meeting!.outcome) as keyof typeof MEETING_OUTCOME_LABELS]}
                     </Badge>
                   ) : null}
                 </div>
                 <p className="mt-1 text-sm text-muted-foreground">{scheduledLabel}</p>
-                {meeting?.customer ? (
+                {selectedCustomer ? (
                   <p className="mt-0.5 text-xs text-muted-foreground">
-                    Customer: {meeting.customer.name}
+                    Customer: {selectedCustomer.name}
                   </p>
                 ) : null}
               </>
@@ -309,8 +355,74 @@ export function MeetingDetailModal({ meetingId, onClose }: MeetingDetailModalPro
                   <CardTitle className="text-sm">Meeting details</CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-3">
-                  <div className="space-y-1">
-                    <label className="text-xs font-medium text-muted-foreground">Join URL</label>
+                  <Field label="Title">
+                    <Input
+                      value={draft.title}
+                      onChange={(e) => setDraft((c) => ({ ...c, title: e.target.value }))}
+                      placeholder="Meeting title"
+                    />
+                  </Field>
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    <Field label="Scheduled">
+                      <Input
+                        type="datetime-local"
+                        value={draft.scheduledAt}
+                        onChange={(e) => setDraft((c) => ({ ...c, scheduledAt: e.target.value }))}
+                      />
+                    </Field>
+                    <Field label="Duration (minutes)">
+                      <Input
+                        type="number"
+                        min={1}
+                        value={draft.durationMinutes}
+                        onChange={(e) => setDraft((c) => ({ ...c, durationMinutes: e.target.value }))}
+                        placeholder="60"
+                      />
+                    </Field>
+                  </div>
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    <Field label="Type">
+                      <select
+                        className="flex h-9 w-full rounded-lg border border-input bg-muted/50 px-3 py-1 text-sm"
+                        value={draft.type}
+                        onChange={(e) => setDraft((c) => ({ ...c, type: e.target.value }))}
+                      >
+                        {MEETING_TYPE_OPTIONS.map((option) => (
+                          <option key={option.value} value={option.value}>
+                            {option.label}
+                          </option>
+                        ))}
+                      </select>
+                    </Field>
+                    <Field label="Status">
+                      <select
+                        className="flex h-9 w-full rounded-lg border border-input bg-muted/50 px-3 py-1 text-sm"
+                        value={draft.status}
+                        onChange={(e) => setDraft((c) => ({ ...c, status: e.target.value }))}
+                      >
+                        {MEETING_STATUS_OPTIONS.map((option) => (
+                          <option key={option.value} value={option.value}>
+                            {option.label}
+                          </option>
+                        ))}
+                      </select>
+                    </Field>
+                  </div>
+                  <Field label="Customer">
+                    <select
+                      className="flex h-9 w-full rounded-lg border border-input bg-muted/50 px-3 py-1 text-sm"
+                      value={draft.customerId}
+                      onChange={(e) => setDraft((c) => ({ ...c, customerId: e.target.value }))}
+                    >
+                      <option value="">No customer linked</option>
+                      {customers.map((customer) => (
+                        <option key={customer.id} value={customer.id}>
+                          {customer.name}
+                        </option>
+                      ))}
+                    </select>
+                  </Field>
+                  <Field label="Join URL">
                     <Input
                       value={draft.meetingUrl}
                       onChange={(e) =>
@@ -318,27 +430,23 @@ export function MeetingDetailModal({ meetingId, onClose }: MeetingDetailModalPro
                       }
                       placeholder="https://zoom.us/j/... or meet.google.com/..."
                     />
-                  </div>
-                  <div className="space-y-1">
-                    <label className="text-xs font-medium text-muted-foreground">Location</label>
+                  </Field>
+                  <Field label="Location">
                     <Input
                       value={draft.location}
                       onChange={(e) => setDraft((c) => ({ ...c, location: e.target.value }))}
                       placeholder="Physical location"
                     />
-                  </div>
-                  <div className="space-y-1">
-                    <label className="text-xs font-medium text-muted-foreground">Agenda</label>
+                  </Field>
+                  <Field label="Agenda">
                     <Textarea
                       value={draft.agenda}
                       onChange={(e) => setDraft((c) => ({ ...c, agenda: e.target.value }))}
                       rows={3}
+                      placeholder="Topics to cover"
                     />
-                  </div>
-                  <div className="space-y-1">
-                    <label className="text-xs font-medium text-muted-foreground">
-                      Outcome report
-                    </label>
+                  </Field>
+                  <Field label="Outcome report">
                     <Textarea
                       value={draft.outcomeReport}
                       onChange={(e) =>
@@ -347,20 +455,32 @@ export function MeetingDetailModal({ meetingId, onClose }: MeetingDetailModalPro
                       rows={5}
                       placeholder="What happened? Decisions, concerns, next steps..."
                     />
-                  </div>
-                  <div className="space-y-1">
-                    <label className="text-xs font-medium text-muted-foreground">Minutes / notes</label>
+                  </Field>
+                  <Field label="Outcome rating">
+                    <select
+                      className="flex h-9 w-full rounded-lg border border-input bg-muted/50 px-3 py-1 text-sm"
+                      value={draft.outcome}
+                      onChange={(e) => setDraft((c) => ({ ...c, outcome: e.target.value }))}
+                    >
+                      {MEETING_OUTCOME_OPTIONS.map((option) => (
+                        <option key={option.value} value={option.value}>
+                          {option.label}
+                        </option>
+                      ))}
+                    </select>
+                  </Field>
+                  <Field label="Minutes / notes">
                     <Textarea
                       value={draft.minutes}
                       onChange={(e) => setDraft((c) => ({ ...c, minutes: e.target.value }))}
                       rows={4}
                     />
-                  </div>
+                  </Field>
                   <div className="flex flex-wrap gap-2">
                     <Button size="sm" onClick={saveMeeting} disabled={saving}>
                       Save
                     </Button>
-                    {meeting?.status === "SCHEDULED" ? (
+                    {draft.status === "SCHEDULED" ? (
                       <Button size="sm" variant="outline" onClick={markCompleted} disabled={saving}>
                         <CheckCircle2 className="mr-1 h-3.5 w-3.5" />
                         Mark complete
@@ -497,15 +617,6 @@ export function MeetingDetailModal({ meetingId, onClose }: MeetingDetailModalPro
                 </CardContent>
               </Card>
 
-              {meeting?.location && !draft.meetingUrl ? (
-                <Card>
-                  <CardContent className="flex items-center gap-2 p-4 text-sm">
-                    <MapPin className="h-4 w-4 text-muted-foreground" />
-                    {meeting.location}
-                  </CardContent>
-                </Card>
-              ) : null}
-
               {meeting?.externalParticipants && meeting.externalParticipants.length > 0 ? (
                 <Card>
                   <CardHeader className="pb-2">
@@ -527,6 +638,15 @@ export function MeetingDetailModal({ meetingId, onClose }: MeetingDetailModalPro
           </div>
         )}
       </div>
+    </div>
+  );
+}
+
+function Field({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div className="space-y-1">
+      <label className="text-xs font-medium text-muted-foreground">{label}</label>
+      {children}
     </div>
   );
 }

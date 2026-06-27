@@ -30,20 +30,25 @@ export const POST = withAuth(async (request, { user }) => {
   }
 
   const meetingContext = `Source meeting: ${meeting.title} (${meeting.scheduledAt?.toISOString().slice(0, 10) ?? "unscheduled"})`;
-  const created = await Promise.all(
-    decisions.map((item) =>
-      decisionRepository.create({
-        title: item.title,
-        context: `${item.context}\n\n${meetingContext}`,
-        alternatives: item.alternatives,
-        decision: item.decision,
-        reasoning: item.reasoning,
-        status: "APPROVED",
-        ownerId: user.id,
-        reviewDate: new Date(Date.now() + 90 * 86400000),
-      })
+  const created = (
+    await Promise.all(
+      decisions.map((item) =>
+        decisionRepository.create(
+          {
+            title: item.title,
+            context: `${item.context}\n\n${meetingContext}`,
+            alternatives: item.alternatives,
+            decision: item.decision,
+            reasoning: item.reasoning,
+            status: "APPROVED",
+            ownerId: user.id,
+            reviewDate: new Date(Date.now() + 90 * 86400000),
+          },
+          user.id
+        )
+      )
     )
-  );
+  ).filter((item): item is NonNullable<typeof item> => item !== null);
 
   await auditLog({
     userId: user.id,

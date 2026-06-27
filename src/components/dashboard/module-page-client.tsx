@@ -22,6 +22,11 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { cn } from "@/lib/utils";
+
+export type RowRenderContext = {
+  onRowClick?: () => void;
+};
 
 export type CreateField = {
   name: string;
@@ -57,7 +62,8 @@ interface ModulePageClientProps {
   emptyDescription: string;
   createFields?: CreateField[];
   createEnabled?: boolean;
-  renderRow?: (item: Record<string, unknown>) => React.ReactNode;
+  renderRow?: (item: Record<string, unknown>, context: RowRenderContext) => React.ReactNode;
+  onRowClick?: (item: Record<string, unknown>) => void;
 }
 
 export function ModulePageClient({
@@ -71,6 +77,7 @@ export function ModulePageClient({
   createFields = DEFAULT_CREATE_FIELDS,
   createEnabled = true,
   renderRow,
+  onRowClick,
 }: ModulePageClientProps) {
   const [items, setItems] = useState<Record<string, unknown>[]>([]);
   const [loading, setLoading] = useState(true);
@@ -103,9 +110,15 @@ export function ModulePageClient({
     }
     window.addEventListener("research:updated", handleModuleUpdated);
     window.addEventListener("journal:updated", handleModuleUpdated);
+    window.addEventListener("compliance:updated", handleModuleUpdated);
+    window.addEventListener("risk:updated", handleModuleUpdated);
+    window.addEventListener("product:updated", handleModuleUpdated);
     return () => {
       window.removeEventListener("research:updated", handleModuleUpdated);
       window.removeEventListener("journal:updated", handleModuleUpdated);
+      window.removeEventListener("compliance:updated", handleModuleUpdated);
+      window.removeEventListener("risk:updated", handleModuleUpdated);
+      window.removeEventListener("product:updated", handleModuleUpdated);
     };
   }, [fetchItems]);
 
@@ -254,8 +267,12 @@ export function ModulePageClient({
     </Card>
   ) : null;
 
-  const defaultRenderRow = (item: Record<string, unknown>) => (
-    <TableRow key={String(item.id)}>
+  const defaultRenderRow = (item: Record<string, unknown>, context: RowRenderContext) => (
+    <TableRow
+      key={String(item.id)}
+      className={cn(context.onRowClick && "cursor-pointer")}
+      onClick={context.onRowClick}
+    >
       <TableCell className="font-medium">{String(item.title ?? item.name ?? "—")}</TableCell>
       <TableCell>
         {item.status || item.stage ? (
@@ -302,9 +319,14 @@ export function ModulePageClient({
               </TableRow>
             </TableHeader>
             <TableBody>
-              {items.map((item) =>
-                renderRow ? renderRow(item) : defaultRenderRow(item)
-              )}
+              {items.map((item) => {
+                const rowContext: RowRenderContext = {
+                  onRowClick: onRowClick ? () => onRowClick(item) : undefined,
+                };
+                return renderRow
+                  ? renderRow(item, rowContext)
+                  : defaultRenderRow(item, rowContext);
+              })}
             </TableBody>
           </Table>
         </div>

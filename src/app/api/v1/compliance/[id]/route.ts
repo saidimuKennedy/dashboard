@@ -1,4 +1,3 @@
-import { NextRequest } from "next/server";
 import { withAuth } from "@/lib/api/middleware";
 import { success, notFound } from "@/lib/api/response";
 import { parseBody, getClientIp } from "@/lib/api/helpers";
@@ -6,6 +5,12 @@ import { updateComplianceSchema } from "@/lib/validations";
 import { complianceRepository } from "@/server/repositories/domains.repository";
 import { auditLog } from "@/lib/logger/audit";
 import { db } from "@/lib/db";
+
+export const GET = withAuth(async (_request, { params }) => {
+  const item = await complianceRepository.getById(params!.id);
+  if (!item) return notFound("Compliance item not found.");
+  return success(item);
+}, "compliance.manage");
 
 export const PATCH = withAuth(async (request, { user, params }) => {
   const parsed = await parseBody(request, updateComplianceSchema);

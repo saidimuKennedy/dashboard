@@ -14,6 +14,8 @@ export const dashboardRepository = {
       recentMeetings,
       upcomingMeetings,
       meetingReminders,
+      decisionReminders,
+      decisionsDueForReview,
       recentJournal,
       notifications,
     ] = await Promise.all([
@@ -73,6 +75,46 @@ export const dashboardRepository = {
           meeting: { select: { id: true, title: true, scheduledAt: true, meetingUrl: true } },
         },
       }),
+      db.reminder.findMany({
+        where: {
+          deletedAt: null,
+          completed: false,
+          userId,
+          decisionId: { not: null },
+        },
+        take: 5,
+        orderBy: { dueAt: "asc" },
+        select: {
+          id: true,
+          title: true,
+          dueAt: true,
+          decisionId: true,
+          decision: {
+            select: {
+              id: true,
+              title: true,
+              reviewDate: true,
+              status: true,
+            },
+          },
+        },
+      }),
+      db.decision.findMany({
+        where: {
+          deletedAt: null,
+          reviewDate: { lte: now },
+          status: { notIn: ["REVIEWED", "SUPERSEDED"] },
+        },
+        take: 5,
+        orderBy: { reviewDate: "asc" },
+        select: {
+          id: true,
+          title: true,
+          reviewDate: true,
+          status: true,
+          owner: { select: { id: true, firstName: true, lastName: true } },
+        },
+      }),
       db.journalEntry.findMany({
         where: { deletedAt: null },
         take: 5,
@@ -101,7 +143,7 @@ export const dashboardRepository = {
       highRisks: openRisks,
     };
 
-    let aiBrief = buildFounderBrief(kpis);
+    let aiBrief = buildFounderBrief(kpis, decisionsDueForReview.length);
     const deepseekKey = await getDeepSeekApiKey();
     if (deepseekKey) {
       try {
@@ -120,6 +162,8 @@ export const dashboardRepository = {
       recentMeetings,
       upcomingMeetings,
       meetingReminders,
+      decisionReminders,
+      decisionsDueForReview,
       recentJournal,
       notifications,
       aiBrief,
@@ -134,12 +178,16 @@ function buildFounderBrief(kpis: {
   mrr: number;
   complianceIssues: number;
   highRisks: number;
-}): string {
+}, decisionsDue = 0): string {
   const parts = [
     `${kpis.knowledgeArticles} knowledge article${kpis.knowledgeArticles === 1 ? "" : "s"} published.`,
     `${kpis.customers} active customer${kpis.customers === 1 ? "" : "s"}.`,
     `MRR at KES ${kpis.mrr.toLocaleString()}.`,
   ];
+
+  if (decisionsDue > 0) {
+    parts.push(`${decisionsDue} decision${decisionsDue === 1 ? "" : "s"} due for review.`);
+  }
 
   if (kpis.highRisks > 0) {
     parts.push(`${kpis.highRisks} high-risk item${kpis.highRisks === 1 ? "" : "s"} need review.`);
@@ -331,6 +379,13 @@ export const contractSettingsRepository = {
 };
 
 export const journalRepository = {
+  async getById(id: string) {
+    return db.journalEntry.findFirst({
+      where: { id, deletedAt: null },
+      include: { author: { select: { firstName: true, lastName: true } } },
+    });
+  },
+
   async list(authorId: string | undefined, skip: number, take: number) {
     const where = { deletedAt: null, ...(authorId && { authorId }) };
     const [items, total] = await Promise.all([

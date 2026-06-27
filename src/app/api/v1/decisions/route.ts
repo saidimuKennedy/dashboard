@@ -1,6 +1,5 @@
-import { NextRequest } from "next/server";
 import { withAuth } from "@/lib/api/middleware";
-import { success } from "@/lib/api/response";
+import { success, error } from "@/lib/api/response";
 import { parseBody, getClientIp, paginatedData } from "@/lib/api/helpers";
 import { parsePagination } from "@/lib/api/response";
 import { createDecisionSchema } from "@/lib/validations";
@@ -36,12 +35,19 @@ export const POST = withAuth(async (request, { user }) => {
     evidence = evidence ? `${evidence}\n\n${premortemBlock}` : premortemBlock;
   }
 
-  const decision = await decisionRepository.create({
-    ...rest,
-    evidence,
-    status: status ?? "APPROVED",
-    ownerId: rest.ownerId ?? user.id,
-  });
+  const decision = await decisionRepository.create(
+    {
+      ...rest,
+      evidence,
+      status: status ?? "APPROVED",
+      ownerId: rest.ownerId ?? user.id,
+    },
+    user.id
+  );
+
+  if (!decision) {
+    return error("Failed to create decision.", "CREATE_FAILED", 500);
+  }
 
   await auditLog({
     userId: user.id,

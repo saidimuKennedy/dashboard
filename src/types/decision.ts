@@ -1,5 +1,7 @@
 import type { DecisionStatus } from "@prisma/client";
 
+export type { DecisionStatus };
+
 export type DecisionListItem = {
   id: string;
   title: string;
@@ -11,12 +13,22 @@ export type DecisionListItem = {
   owner: { id: string; firstName: string; lastName: string } | null;
 };
 
+export type DecisionStatusHistoryEntry = {
+  id: string;
+  fromStatus: DecisionStatus | null;
+  toStatus: DecisionStatus;
+  note: string | null;
+  createdAt: string;
+  user: { id: string; firstName: string; lastName: string } | null;
+};
+
 export type DecisionDetail = DecisionListItem & {
   context: string;
   alternatives: string | null;
   decision: string;
   reasoning: string | null;
   evidence: string | null;
+  statusHistory: DecisionStatusHistoryEntry[];
 };
 
 export type DecisionFromChatAnalysis = {
@@ -88,4 +100,12 @@ export function isReviewDue(reviewDate: string | null, status: DecisionStatus): 
   if (!reviewDate) return false;
   if (status === "REVIEWED" || status === "SUPERSEDED") return false;
   return new Date(reviewDate) <= new Date();
+}
+
+export function formatStatusTransition(
+  fromStatus: DecisionStatus | null,
+  toStatus: DecisionStatus
+): string {
+  if (!fromStatus) return DECISION_STATUS_LABELS[toStatus];
+  return `${DECISION_STATUS_LABELS[fromStatus]} → ${DECISION_STATUS_LABELS[toStatus]}`;
 }

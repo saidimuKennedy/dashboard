@@ -1,5 +1,6 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
+import { cn } from "@/lib/utils";
 
 function formatRelative(date: string | Date) {
   const diff = Date.now() - new Date(date).getTime();
@@ -24,9 +25,10 @@ interface RecentActivityProps {
   items?: ActivityItem[];
   loading?: boolean;
   emptyMessage?: string;
+  onItemClick?: (id: string) => void;
 }
 
-export function RecentActivity({ title, items, loading, emptyMessage }: RecentActivityProps) {
+export function RecentActivity({ title, items, loading, emptyMessage, onItemClick }: RecentActivityProps) {
   return (
     <Card>
       <CardHeader className="pb-2">
@@ -45,7 +47,26 @@ export function RecentActivity({ title, items, loading, emptyMessage }: RecentAc
         ) : items && items.length > 0 ? (
           <ul className="space-y-3">
             {items.map((item) => (
-              <li key={item.id} className="border-b border-border pb-3 last:border-0 last:pb-0">
+              <li
+                key={item.id}
+                className={cn(
+                  "border-b border-border pb-3 last:border-0 last:pb-0",
+                  onItemClick && "cursor-pointer rounded-md transition-colors hover:bg-muted/50 -mx-2 px-2 py-1"
+                )}
+                onClick={onItemClick ? () => onItemClick(item.id) : undefined}
+                onKeyDown={
+                  onItemClick
+                    ? (event) => {
+                        if (event.key === "Enter" || event.key === " ") {
+                          event.preventDefault();
+                          onItemClick(item.id);
+                        }
+                      }
+                    : undefined
+                }
+                role={onItemClick ? "button" : undefined}
+                tabIndex={onItemClick ? 0 : undefined}
+              >
                 <p className="text-sm font-medium leading-snug">{item.title}</p>
                 {item.subtitle && (
                   <p className="mt-0.5 line-clamp-2 text-xs text-muted-foreground">

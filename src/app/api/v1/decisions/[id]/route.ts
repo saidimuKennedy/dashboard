@@ -1,9 +1,8 @@
-import { NextRequest } from "next/server";
 import { withAuth } from "@/lib/api/middleware";
-import { success, notFound } from "@/lib/api/response";
+import { success, notFound, error } from "@/lib/api/response";
 import { parseBody, getClientIp } from "@/lib/api/helpers";
 import { updateDecisionSchema } from "@/lib/validations";
-import { decisionRepository } from "@/server/repositories/domains.repository";
+import { decisionRepository, InvalidStatusTransitionError } from "@/server/repositories/domains.repository";
 import { auditLog } from "@/lib/logger/audit";
 import { db } from "@/lib/db";
 
@@ -18,8 +17,30 @@ export const PATCH = withAuth(async (request, { user, params }) => {
   if (!parsed.ok) return parsed.response;
   const existing = await db.decision.findFirst({ where: { id: params!.id, deletedAt: null } });
   if (!existing) return notFound("Decision not found.");
-  const decision = await decisionRepository.update(params!.id, parsed.data, user.id);
-  await auditLog({ userId: user.id, action: "decision.update", resource: "decisions", resourceId: params!.id, ipAddress: getClientIp(request) });
+
+  let decision;
+  try {
+    decision = await decisionRepository.update(params!.id, parsed.data, user.id);
+  } catch (err) {
+    if (err instanceof InvalidStatusTransitionError) {
+      return error(err.message, err.code, 400);
+    }
+    throw err;
+  }
+
+  if (!decision) return notFound("Decision not found.");
+
+  await auditLog({
+    userId: user.id,
+    action: "decision.update",
+    resource: "decisions",
+    resourceId: params!.id,
+    ipAddress: getClientIp(request),
+    metadata:
+      parsed.data.status && parsed.data.status !== existing.status
+        ? { fromStatus: existing.status, toStatus: parsed.data.status }
+        : undefined,
+  });
   return success(decision, "Decision updated.");
 });
 

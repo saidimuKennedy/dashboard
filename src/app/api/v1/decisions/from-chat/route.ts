@@ -1,5 +1,5 @@
 import { withAuth } from "@/lib/api/middleware";
-import { success } from "@/lib/api/response";
+import { success, error } from "@/lib/api/response";
 import { parseBody, getClientIp } from "@/lib/api/helpers";
 import { decisionFromChatSchema } from "@/lib/validations";
 import { decisionRepository } from "@/server/repositories/domains.repository";
@@ -17,17 +17,24 @@ export const POST = withAuth(async (request, { user }) => {
     ? new Date(analysis.reviewDateSuggestion)
   : undefined;
 
-  const decision = await decisionRepository.create({
-    title: analysis.title,
-    context: analysis.context,
-    alternatives: analysis.alternatives,
-    decision: analysis.decision,
-    reasoning: analysis.reasoning,
-    evidence: analysis.evidence,
-    reviewDate: reviewDate && !Number.isNaN(reviewDate.getTime()) ? reviewDate : undefined,
-    status: "APPROVED",
-    ownerId: user.id,
-  });
+  const decision = await decisionRepository.create(
+    {
+      title: analysis.title,
+      context: analysis.context,
+      alternatives: analysis.alternatives,
+      decision: analysis.decision,
+      reasoning: analysis.reasoning,
+      evidence: analysis.evidence,
+      reviewDate: reviewDate && !Number.isNaN(reviewDate.getTime()) ? reviewDate : undefined,
+      status: "APPROVED",
+      ownerId: user.id,
+    },
+    user.id
+  );
+
+  if (!decision) {
+    return error("Failed to create decision.", "CREATE_FAILED", 500);
+  }
 
   await auditLog({
     userId: user.id,

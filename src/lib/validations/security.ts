@@ -24,6 +24,15 @@ export const updateRiskSchema = z.object({
   reviewDate: z.coerce.date().optional(),
 });
 
+export const updateRiskPatchSchema = z.object({
+  title: z.string().min(1).optional(),
+  description: z.string().optional().nullable(),
+  category: z.nativeEnum(RiskCategory).optional(),
+  level: z.nativeEnum(RiskLevel).optional(),
+  mitigation: z.string().optional().nullable(),
+  reviewDate: z.coerce.date().optional().nullable(),
+});
+
 export const createRiskSchema = z.object({
   title: z.string().min(1),
   description: z.string().optional(),

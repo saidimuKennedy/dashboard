@@ -1,4 +1,3 @@
-import { NextRequest } from "next/server";
 import { withAuth } from "@/lib/api/middleware";
 import { success, notFound } from "@/lib/api/response";
 import { parseBody, getClientIp } from "@/lib/api/helpers";
@@ -6,6 +5,12 @@ import { updateJournalSchema } from "@/lib/validations";
 import { journalRepository } from "@/server/repositories/dashboard.repository";
 import { auditLog } from "@/lib/logger/audit";
 import { db } from "@/lib/db";
+
+export const GET = withAuth(async (_request, { params }) => {
+  const entry = await journalRepository.getById(params!.id);
+  if (!entry) return notFound("Journal entry not found.");
+  return success(entry);
+});
 
 export const PATCH = withAuth(async (request, { user, params }) => {
   const parsed = await parseBody(request, updateJournalSchema);

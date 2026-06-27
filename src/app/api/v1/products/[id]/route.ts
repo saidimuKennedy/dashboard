@@ -1,10 +1,15 @@
-import { NextRequest } from "next/server";
 import { withAuth } from "@/lib/api/middleware";
 import { success, notFound } from "@/lib/api/response";
 import { parseBody, getClientIp } from "@/lib/api/helpers";
 import { updateProductSchema } from "@/lib/validations";
 import { productRepository } from "@/server/repositories/domains.repository";
 import { auditLog } from "@/lib/logger/audit";
+
+export const GET = withAuth(async (_request, { params }) => {
+  const product = await productRepository.getById(params!.id);
+  if (!product) return notFound("Product not found.");
+  return success(product);
+});
 
 export const PATCH = withAuth(async (request, { user, params }) => {
   const parsed = await parseBody(request, updateProductSchema);

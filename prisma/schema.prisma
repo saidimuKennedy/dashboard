@@ -152,7 +152,8 @@ model User {
 
   articles         KnowledgeArticle[]
   journalEntries     JournalEntry[]
-  decisions          Decision[]
+  decisions              Decision[]
+  decisionStatusChanges  DecisionStatusHistory[]
   meetings           Meeting[]           @relation("MeetingCreator")
   meetingParticipants MeetingParticipant[]
   researchTopics     ResearchTopic[]
@@ -328,11 +329,30 @@ model Decision {
   deletedAt   DateTime?      @map("deleted_at")
   version     Int            @default(1)
 
-  owner User? @relation(fields: [ownerId], references: [id])
+  owner         User?                   @relation(fields: [ownerId], references: [id])
+  statusHistory DecisionStatusHistory[]
+  reminders     Reminder[]
 
   @@index([ownerId])
   @@index([status])
+  @@index([reviewDate])
   @@map("decisions")
+}
+
+model DecisionStatusHistory {
+  id         String          @id @default(uuid())
+  decisionId String          @map("decision_id")
+  fromStatus DecisionStatus? @map("from_status")
+  toStatus   DecisionStatus  @map("to_status")
+  changedBy  String?         @map("changed_by")
+  note       String?
+  createdAt  DateTime        @default(now()) @map("created_at")
+
+  decision Decision @relation(fields: [decisionId], references: [id], onDelete: Cascade)
+  user     User?    @relation(fields: [changedBy], references: [id])
+
+  @@index([decisionId, createdAt])
+  @@map("decision_status_history")
 }
 
 model Idea {
@@ -912,17 +932,20 @@ model Reminder {
   description String?
   dueAt       DateTime  @map("due_at")
   completed   Boolean   @default(false)
-  userId      String?   @map("user_id")
-  meetingId   String?   @map("meeting_id")
-  createdAt   DateTime  @default(now()) @map("created_at")
-  updatedAt   DateTime  @updatedAt @map("updated_at")
-  deletedAt   DateTime? @map("deleted_at")
+  userId     String?   @map("user_id")
+  meetingId  String?   @map("meeting_id")
+  decisionId String?   @map("decision_id")
+  createdAt  DateTime  @default(now()) @map("created_at")
+  updatedAt  DateTime  @updatedAt @map("updated_at")
+  deletedAt  DateTime? @map("deleted_at")
 
-  user    User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
-  meeting Meeting? @relation(fields: [meetingId], references: [id], onDelete: Cascade)
+  user     User?     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  meeting  Meeting?  @relation(fields: [meetingId], references: [id], onDelete: Cascade)
+  decision Decision? @relation(fields: [decisionId], references: [id], onDelete: Cascade)
 
   @@index([dueAt])
   @@index([meetingId])
+  @@index([decisionId])
   @@map("reminders")
 }
 

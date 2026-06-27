@@ -13,10 +13,13 @@ import { cn } from "@/lib/utils";
 import {
   DECISION_STATUS_LABELS,
   DECISION_STATUS_OPTIONS,
+  formatStatusTransition,
   isReviewDue,
   type DecisionDetail,
   type SimilarDecision,
 } from "@/types/decision";
+import { getSelectableStatuses } from "@/lib/decisions/status-transitions";
+import type { DecisionStatus } from "@prisma/client";
 
 interface DecisionDetailModalProps {
   decisionId: string | null;
@@ -60,7 +63,7 @@ export function DecisionDetailModal({ decisionId, onClose }: DecisionDetailModal
           return;
         }
         const data = json.data as DecisionDetail;
-        setDecision(data);
+        setDecision({ ...data, statusHistory: data.statusHistory ?? [] });
         setDraft({
           title: data.title,
           context: data.context,
@@ -112,6 +115,12 @@ export function DecisionDetailModal({ decisionId, onClose }: DecisionDetailModal
   if (!decisionId) return null;
 
   const reviewDue = decision ? isReviewDue(decision.reviewDate, decision.status) : false;
+  const selectableStatuses = decision
+    ? getSelectableStatuses(decision.status as DecisionStatus).map((value) => ({
+        value,
+        label: DECISION_STATUS_LABELS[value],
+      }))
+    : DECISION_STATUS_OPTIONS;
 
   async function saveDecision() {
     if (!decisionId) return;
@@ -306,12 +315,17 @@ export function DecisionDetailModal({ decisionId, onClose }: DecisionDetailModal
                     value={draft.status}
                     onChange={(e) => setDraft((c) => ({ ...c, status: e.target.value }))}
                   >
-                    {DECISION_STATUS_OPTIONS.map((option) => (
+                    {selectableStatuses.map((option) => (
                       <option key={option.value} value={option.value}>
                         {option.label}
                       </option>
                     ))}
                   </select>
+                  {decision && draft.status !== decision.status ? (
+                    <p className="text-xs text-muted-foreground">
+                      Next: {formatStatusTransition(decision.status, draft.status as DecisionStatus)}
+                    </p>
+                  ) : null}
                 </Field>
                 <Field label="Review date">
                   <Input
@@ -351,12 +365,54 @@ export function DecisionDetailModal({ decisionId, onClose }: DecisionDetailModal
                     className="w-full"
                     onClick={submitReview}
                     loading={reviewing}
-                    disabled={decision?.status === "REVIEWED"}
+                    disabled={decision?.status === "REVIEWED" || decision?.status === "SUPERSEDED"}
                   >
                     Mark reviewed
                   </Button>
+                  {decision && decision.status === "PROPOSED" ? (
+                    <p className="text-xs text-muted-foreground">
+                      Approve or implement this decision before marking reviewed.
+                    </p>
+                  ) : null}
                 </CardContent>
               </Card>
+
+              {decision?.statusHistory && decision.statusHistory.length > 0 ? (
+                <Card>
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-sm">Status history</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <ul className="space-y-3 text-sm">
+                      {decision.statusHistory.map((entry) => (
+                        <li
+                          key={entry.id}
+                          className="border-b border-border pb-3 last:border-0 last:pb-0"
+                        >
+                          <div className="flex flex-wrap items-center gap-2">
+                            <Badge className={cn(statusStyles[entry.toStatus])}>
+                              {formatStatusTransition(entry.fromStatus, entry.toStatus)}
+                            </Badge>
+                            <span className="text-xs text-muted-foreground">
+                              {new Date(entry.createdAt).toLocaleString()}
+                            </span>
+                          </div>
+                          {entry.user ? (
+                            <p className="mt-1 text-xs text-muted-foreground">
+                              {entry.user.firstName} {entry.user.lastName}
+                            </p>
+                          ) : null}
+                          {entry.note ? (
+                            <p className="mt-1 text-xs text-muted-foreground line-clamp-3">
+                              {entry.note}
+                            </p>
+                          ) : null}
+                        </li>
+                      ))}
+                    </ul>
+                  </CardContent>
+                </Card>
+              ) : null}
 
               {similar.length > 0 ? (
                 <Card>

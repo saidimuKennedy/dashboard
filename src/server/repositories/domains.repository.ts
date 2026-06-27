@@ -1,7 +1,17 @@
 import { db } from "@/lib/db";
+import { clearDecisionReminders, syncDecisionReviewReminders } from "@/lib/decisions/reminders";
+import { assertStatusTransition } from "@/lib/decisions/status-transitions";
 import { DecisionStatus, Prisma, RiskCategory, RiskLevel } from "@prisma/client";
 
+export { InvalidStatusTransitionError } from "@/lib/decisions/status-transitions";
 export { meetingRepository } from "@/server/repositories/meeting.repository";
+
+const statusHistoryInclude = {
+  orderBy: { createdAt: "desc" as const },
+  include: {
+    user: { select: { id: true, firstName: true, lastName: true } },
+  },
+};
 
 export const decisionRepository = {
   async list(skip: number, take: number) {
@@ -16,7 +26,10 @@ export const decisionRepository = {
   async getById(id: string) {
     return db.decision.findFirst({
       where: { id, deletedAt: null },
-      include: { owner: { select: { id: true, firstName: true, lastName: true } } },
+      include: {
+        owner: { select: { id: true, firstName: true, lastName: true } },
+        statusHistory: statusHistoryInclude,
+      },
     });
   },
 
@@ -57,18 +70,54 @@ export const decisionRepository = {
     });
   },
 
-  async create(data: {
-    title: string;
-    context: string;
-    alternatives?: string;
-    decision: string;
-    reasoning?: string;
-    evidence?: string;
-    ownerId?: string;
-    reviewDate?: Date;
-    status?: DecisionStatus;
-  }) {
-    return db.decision.create({ data });
+  async create(
+    data: {
+      title: string;
+      context: string;
+      alternatives?: string;
+      decision: string;
+      reasoning?: string;
+      evidence?: string;
+      ownerId?: string;
+      reviewDate?: Date;
+      status?: DecisionStatus;
+    },
+    userId: string
+  ) {
+    const status = data.status ?? "PROPOSED";
+
+    const created = await db.$transaction(async (tx) => {
+      const decision = await tx.decision.create({
+        data: {
+          ...data,
+          status,
+          createdBy: userId,
+          updatedBy: userId,
+        },
+      });
+
+      await tx.decisionStatusHistory.create({
+        data: {
+          decisionId: decision.id,
+          fromStatus: null,
+          toStatus: status,
+          changedBy: userId,
+          note: "Decision logged",
+        },
+      });
+
+      return decision;
+    });
+
+    await syncDecisionReviewReminders(
+      created.id,
+      userId,
+      created.title,
+      created.reviewDate,
+      created.status
+    );
+
+    return decisionRepository.getById(created.id);
   },
 
   async update(
@@ -86,10 +135,93 @@ export const decisionRepository = {
     }>,
     userId: string
   ) {
-    return db.decision.update({ where: { id }, data: { ...data, updatedBy: userId } });
+    const existing = await db.decision.findFirst({ where: { id, deletedAt: null } });
+    if (!existing) return null;
+
+    if (data.status && data.status !== existing.status) {
+      assertStatusTransition(existing.status, data.status);
+    }
+
+    const nextStatus = data.status ?? existing.status;
+    const nextReviewDate = data.reviewDate !== undefined ? data.reviewDate : existing.reviewDate;
+    const statusChanged = data.status !== undefined && data.status !== existing.status;
+    const reviewDateChanged =
+      data.reviewDate !== undefined &&
+      (existing.reviewDate?.getTime() ?? null) !== (data.reviewDate?.getTime() ?? null);
+
+    await db.$transaction(async (tx) => {
+      await tx.decision.update({
+        where: { id },
+        data: { ...data, updatedBy: userId },
+      });
+
+      if (statusChanged && data.status) {
+        await tx.decisionStatusHistory.create({
+          data: {
+            decisionId: id,
+            fromStatus: existing.status,
+            toStatus: data.status,
+            changedBy: userId,
+          },
+        });
+      }
+    });
+
+    if (statusChanged || reviewDateChanged || data.title) {
+      await syncDecisionReviewReminders(
+        id,
+        existing.ownerId ?? userId,
+        data.title ?? existing.title,
+        nextReviewDate,
+        nextStatus
+      );
+    }
+
+    if (nextStatus === "REVIEWED" || nextStatus === "SUPERSEDED") {
+      await clearDecisionReminders(id);
+    }
+
+    return decisionRepository.getById(id);
+  },
+
+  async recordReview(
+    id: string,
+    userId: string,
+    outcome?: string | null
+  ) {
+    const existing = await db.decision.findFirst({ where: { id, deletedAt: null } });
+    if (!existing) return null;
+
+    assertStatusTransition(existing.status, "REVIEWED");
+
+    await db.$transaction(async (tx) => {
+      await tx.decision.update({
+        where: { id },
+        data: {
+          outcome: outcome ?? existing.outcome,
+          status: "REVIEWED",
+          updatedBy: userId,
+        },
+      });
+
+      await tx.decisionStatusHistory.create({
+        data: {
+          decisionId: id,
+          fromStatus: existing.status,
+          toStatus: "REVIEWED",
+          changedBy: userId,
+          note: outcome ? outcome.slice(0, 500) : "Review completed",
+        },
+      });
+    });
+
+    await clearDecisionReminders(id);
+
+    return decisionRepository.getById(id);
   },
 
   async softDelete(id: string, userId: string) {
+    await clearDecisionReminders(id);
     return db.decision.update({ where: { id }, data: { deletedAt: new Date(), updatedBy: userId } });
   },
 };
@@ -161,6 +293,10 @@ export const revenueRepository = {
 };
 
 export const complianceRepository = {
+  async getById(id: string) {
+    return db.complianceItem.findFirst({ where: { id, deletedAt: null } });
+  },
+
   async list(skip: number, take: number) {
     const where = { deletedAt: null };
     const [items, total] = await Promise.all([
@@ -196,6 +332,10 @@ export const complianceRepository = {
 };
 
 export const riskRepository = {
+  async getById(id: string) {
+    return db.risk.findFirst({ where: { id, deletedAt: null } });
+  },
+
   async list(skip: number, take: number, category?: RiskCategory) {
     const where = { deletedAt: null, ...(category && { category }) };
     const [items, total] = await Promise.all([
@@ -209,8 +349,12 @@ export const riskRepository = {
     return db.risk.create({ data });
   },
 
-  async update(id: string, data: Partial<{ title: string; description: string; level: RiskLevel; mitigation: string; reviewDate: Date }>) {
+  async update(id: string, data: Partial<{ title: string; description: string | null; category: RiskCategory; level: RiskLevel; mitigation: string | null; reviewDate: Date | null }>) {
     return db.risk.update({ where: { id }, data });
+  },
+
+  async softDelete(id: string) {
+    return db.risk.update({ where: { id }, data: { deletedAt: new Date() } });
   },
 };
 

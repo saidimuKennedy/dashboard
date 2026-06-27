@@ -88,3 +88,27 @@ export const MEETING_OUTCOME_LABELS: Record<MeetingOutcome, string> = {
   PARTIAL: "Partial",
   UNSUCCESSFUL: "Unsuccessful",
 };
+
+export const MEETING_TYPE_OPTIONS = Object.entries(MEETING_TYPE_LABELS).map(([value, label]) => ({
+  value,
+  label,
+}));
+
+export const MEETING_STATUS_OPTIONS = Object.entries(MEETING_STATUS_LABELS).map(([value, label]) => ({
+  value,
+  label,
+}));
+
+export const MEETING_OUTCOME_OPTIONS = Object.entries(MEETING_OUTCOME_LABELS).map(([value, label]) => ({
+  value,
+  label,
+}));
+
+export function toDatetimeLocalValue(iso: string | null | undefined): string {
+  if (!iso) return "";
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return "";
+  const offset = date.getTimezoneOffset();
+  const local = new Date(date.getTime() - offset * 60_000);
+  return local.toISOString().slice(0, 16);
+}

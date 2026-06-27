@@ -14,7 +14,9 @@ import { MetricCard } from "@/components/dashboard/metric-card";
 import { AiBriefCard } from "@/components/dashboard/ai-brief-card";
 import { RecentActivity } from "@/components/dashboard/recent-activity";
 import { UpcomingMeetings } from "@/components/dashboard/upcoming-meetings";
+import { DecisionsDueForReview } from "@/components/dashboard/decisions-due-for-review";
 import { formatCurrency, formatCurrencyCompact } from "@/lib/utils";
+import type { DecisionStatus } from "@/types/decision";
 
 interface DashboardData {
   kpis: {
@@ -54,6 +56,25 @@ interface DashboardData {
       scheduledAt?: string | null;
       meetingUrl?: string | null;
     } | null;
+  }>;
+  decisionReminders: Array<{
+    id: string;
+    title: string;
+    dueAt: string;
+    decisionId?: string | null;
+    decision?: {
+      id: string;
+      title: string;
+      reviewDate?: string | null;
+      status?: DecisionStatus;
+    } | null;
+  }>;
+  decisionsDueForReview: Array<{
+    id: string;
+    title: string;
+    reviewDate: string | null;
+    status: DecisionStatus;
+    owner?: { id: string; firstName: string; lastName: string } | null;
   }>;
   recentJournal: Array<{ id: string; date: string; content: string; aiSummary?: string }>;
 }
@@ -130,6 +151,13 @@ export function ExecutiveDashboard() {
         onOpenMeeting={(id) => router.push(`/meetings?open=${id}`)}
       />
 
+      <DecisionsDueForReview
+        due={data?.decisionsDueForReview}
+        reminders={data?.decisionReminders}
+        loading={loading}
+        onOpenDecision={(id) => router.push(`/decisions?open=${id}`)}
+      />
+
       <div className="grid gap-4 lg:grid-cols-2">
         <RecentActivity
           title="Recent Meetings"
@@ -152,6 +180,7 @@ export function ExecutiveDashboard() {
             date: j.date,
           }))}
           emptyMessage="No journal entries yet."
+          onItemClick={(id) => router.push(`/journal?open=${id}`)}
         />
       </div>
     </div>
