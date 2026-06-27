@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useCallback, useEffect, useState } from "react";
+import { FormEvent, useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { ModulePage } from "@/components/dashboard/module-page";
 import {
@@ -77,6 +77,7 @@ export function ModulePageClient({
   const [creating, setCreating] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [formValues, setFormValues] = useState<Record<string, string>>({});
+  const createFormRef = useRef<HTMLDivElement>(null);
 
   const fetchItems = useCallback(() => {
     setLoading(true);
@@ -99,6 +100,9 @@ export function ModulePageClient({
   function openCreateForm() {
     setFormValues({});
     setCreating(true);
+    requestAnimationFrame(() => {
+      createFormRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    });
   }
 
   function closeCreateForm() {
@@ -156,7 +160,7 @@ export function ModulePageClient({
   }
 
   const createForm = creating ? (
-    <Card>
+    <Card ref={createFormRef}>
       <CardHeader>
         <CardTitle>{ctaLabel}</CardTitle>
         <CardDescription>Fill in the details below to create a new entry.</CardDescription>
@@ -299,11 +303,12 @@ export function ModulePageClient({
         onCtaClick={createEnabled ? openCreateForm : undefined}
         showCta={createEnabled}
         loading={loading}
+        creating={creating}
+        createForm={createForm}
         emptyTitle={emptyTitle}
         emptyDescription={emptyDescription}
         columns={columns}
       />
-      {createForm}
     </div>
   );
 }

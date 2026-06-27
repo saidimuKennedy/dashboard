@@ -1,3 +1,5 @@
+"use client";
+
 import { type LucideIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -18,6 +20,8 @@ interface ModulePageProps {
   showCta?: boolean;
   icon?: LucideIcon;
   loading?: boolean;
+  creating?: boolean;
+  createForm?: React.ReactNode;
   emptyTitle?: string;
   emptyDescription?: string;
   columns?: string[];
@@ -30,6 +34,8 @@ export function ModulePage({
   onCtaClick,
   showCta = true,
   loading,
+  creating = false,
+  createForm,
   emptyTitle = "No records yet",
   emptyDescription = "Get started by creating your first entry.",
   columns = ["Name", "Status", "Updated", "Owner"],
@@ -41,7 +47,7 @@ export function ModulePage({
           <h1 className="text-xl font-semibold tracking-tight">{title}</h1>
           <p className="mt-1 text-sm text-muted-foreground">{description}</p>
         </div>
-        {showCta ? <Button onClick={onCtaClick}>{ctaLabel}</Button> : null}
+        {showCta && !creating ? <Button onClick={onCtaClick}>{ctaLabel}</Button> : null}
       </div>
 
       {loading ? (
@@ -67,6 +73,8 @@ export function ModulePage({
             </TableBody>
           </Table>
         </div>
+      ) : creating && createForm ? (
+        createForm
       ) : (
         <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-border py-16 text-center">
           <p className="text-sm font-medium">{emptyTitle}</p>
