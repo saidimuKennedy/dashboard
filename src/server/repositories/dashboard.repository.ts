@@ -254,16 +254,28 @@ export const contractSettingsRepository = {
 
   async get() {
     const { DEFAULT_CONTRACT_SETTINGS } = await import("@/types/customer");
+    const { resolvePdfFont } = await import("@/lib/contracts/markdown-to-pdf-blocks");
     const setting = await db.systemSetting.findUnique({ where: { key: this.key } });
     if (!setting?.value) return DEFAULT_CONTRACT_SETTINGS;
-    return { ...DEFAULT_CONTRACT_SETTINGS, ...(setting.value as Record<string, unknown>) };
+    const stored = setting.value as Record<string, unknown>;
+    return {
+      ...DEFAULT_CONTRACT_SETTINGS,
+      ...stored,
+      fontFamily: resolvePdfFont(String(stored.fontFamily ?? DEFAULT_CONTRACT_SETTINGS.fontFamily)),
+    };
   },
 
   async update(value: unknown, userId?: string) {
+    const { resolvePdfFont } = await import("@/lib/contracts/markdown-to-pdf-blocks");
+    const payload = value as Record<string, unknown>;
+    const normalized = {
+      ...payload,
+      fontFamily: resolvePdfFont(String(payload.fontFamily ?? "helvetica")),
+    };
     return db.systemSetting.upsert({
       where: { key: this.key },
-      create: { key: this.key, value: value as Prisma.InputJsonValue, updatedBy: userId },
-      update: { value: value as Prisma.InputJsonValue, updatedBy: userId },
+      create: { key: this.key, value: normalized as Prisma.InputJsonValue, updatedBy: userId },
+      update: { value: normalized as Prisma.InputJsonValue, updatedBy: userId },
     });
   },
 };

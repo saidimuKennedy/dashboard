@@ -31,6 +31,7 @@ import {
   type CustomerContract,
   type CustomerDetail,
 } from "@/types/customer";
+import { PDF_FONT_OPTIONS, pdfFontLabel } from "@/lib/contracts/markdown-to-pdf-blocks";
 
 type Tab = "overview" | "contracts" | "settings" | "insights" | "discuss";
 
@@ -882,12 +883,21 @@ function SettingsTab({
           </div>
         </div>
         <div className="space-y-2">
-          <label className="text-sm">Font family</label>
-          <Input
+          <label className="text-sm">PDF font (entire document)</label>
+          <select
+            className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 text-sm"
             value={settings.fontFamily}
             onChange={(e) => setSettings((s) => ({ ...s, fontFamily: e.target.value }))}
-            placeholder="Helvetica, Arial, sans-serif"
-          />
+          >
+            {PDF_FONT_OPTIONS.map((option) => (
+              <option key={option.value} value={option.value}>
+                {option.label}
+              </option>
+            ))}
+          </select>
+          <p className="text-xs text-muted-foreground">
+            One font is used consistently across the whole PDF — headers, body, and footer.
+          </p>
         </div>
         <div className="space-y-2">
           <label className="text-sm">Payment / terms footer</label>
@@ -924,7 +934,14 @@ function SettingsTab({
         <CardContent>
           <div
             className="rounded-lg border bg-white p-5 text-sm text-gray-900 shadow-sm"
-            style={{ fontFamily: settings.fontFamily }}
+            style={{
+              fontFamily:
+                settings.fontFamily === "times"
+                  ? "Georgia, 'Times New Roman', serif"
+                  : settings.fontFamily === "courier"
+                    ? "Courier New, monospace"
+                    : "Helvetica, Arial, sans-serif",
+            }}
           >
             <div className="flex items-start justify-between gap-4">
               <div>
@@ -938,12 +955,12 @@ function SettingsTab({
                 <p className="text-xs text-gray-500">{settings.contactEmail}</p>
                 <p className="text-xs text-gray-500">{settings.location}</p>
               </div>
-              <span
-                className="rounded px-2 py-1 text-[10px] font-bold uppercase tracking-wider text-white"
-                style={{ backgroundColor: settings.accentColor }}
+              <p
+                className="text-right text-sm font-bold uppercase tracking-wide"
+                style={{ color: settings.accentColor }}
               >
                 {settings.documentLabel}
-              </span>
+              </p>
             </div>
             <div className="my-4 border-t border-gray-200" />
             <p className="text-[10px] font-bold uppercase tracking-wider" style={{ color: settings.accentColor }}>
@@ -995,7 +1012,9 @@ function SettingsTab({
                 <p className="mt-1 text-xs text-gray-500">{settings.paymentDetails}</p>
               </div>
             ) : null}
-            <p className="mt-4 text-center text-[10px] italic text-gray-400">{settings.footerText}</p>
+            <p className="mt-4 text-center text-[10px] italic text-gray-400">
+              {settings.footerText} · {pdfFontLabel(settings.fontFamily as "helvetica" | "times" | "courier")}
+            </p>
           </div>
         </CardContent>
       </Card>

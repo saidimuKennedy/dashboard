@@ -110,7 +110,8 @@ Generate a professional service contract using ONLY the masked customer alias â€
 Use placeholder "[CLIENT_ALIAS]" for the client party name.
 Style: ${templateStyle}
 Include: scope of work, payment terms, IP ownership, confidentiality, termination, governing law (Kenya).
-Return the contract as plain text/markdown, not JSON.`;
+Write in plain readable text only. Do NOT use markdown syntax â€” no # headers, no ** bold markers, no bullet dashes.
+Use numbered sections like "1. SCOPE OF WORK" on their own line, then plain paragraphs below each section.`;
 
   const userPrompt = `Customer context (masked):\n${maskedContext}\n\nContract terms to incorporate:\n${terms}`;
   return callDeepSeek(systemPrompt, userPrompt, 0.3);

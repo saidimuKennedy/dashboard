@@ -69,7 +69,7 @@ export const customerChatSchema = z.object({
 export const contractSettingsSchema = z.object({
   headerColor: z.string(),
   accentColor: z.string(),
-  fontFamily: z.string(),
+  fontFamily: z.enum(["helvetica", "times", "courier"]),
   logoUrl: z.string(),
   footerText: z.string(),
   includeSignatureBlock: z.boolean(),

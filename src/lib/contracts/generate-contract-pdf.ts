@@ -1,6 +1,11 @@
 import type { ContractTemplateSettings, CustomerContract } from "@/types/customer";
-
-type PdfFont = "helvetica" | "times" | "courier";
+import {
+  parseMarkdownToBlocks,
+  resolvePdfFont,
+  type MarkdownBlock,
+  type PdfFontFamily,
+  type TextSegment,
+} from "@/lib/contracts/markdown-to-pdf-blocks";
 
 export type ContractPdfInput = {
   contract: CustomerContract;
@@ -9,7 +14,9 @@ export type ContractPdfInput = {
   clientCompany?: string | null;
 };
 
-function hexToRgb(hex: string): { r: number; g: number; b: number } {
+type Rgb = { r: number; g: number; b: number };
+
+function hexToRgb(hex: string): Rgb {
   const match = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
   if (!match) return { r: 30, g: 58, b: 95 };
   return {
@@ -17,13 +24,6 @@ function hexToRgb(hex: string): { r: number; g: number; b: number } {
     g: parseInt(match[2], 16),
     b: parseInt(match[3], 16),
   };
-}
-
-function resolvePdfFont(fontFamily: string): PdfFont {
-  const lower = fontFamily.toLowerCase();
-  if (lower.includes("courier") || lower.includes("mono")) return "courier";
-  if (lower.includes("times") || lower.includes("georgia") || lower.includes("serif")) return "times";
-  return "helvetica";
 }
 
 function formatDate(value: string): string {
@@ -49,19 +49,130 @@ function slugifyFilename(title: string): string {
   return slug || "contract";
 }
 
-function wrapText(
+function setFont(
   doc: import("jspdf").jsPDF,
-  text: string,
+  font: PdfFontFamily,
+  style: "normal" | "bold" | "italic" | "bolditalic"
+) {
+  doc.setFont(font, style);
+}
+
+function ensureSpace(
+  doc: import("jspdf").jsPDF,
+  y: number,
+  needed: number,
+  margin: number,
+  pageHeight: number
+): number {
+  if (y + needed <= pageHeight - 20) return y;
+  doc.addPage();
+  return margin;
+}
+
+function drawSegmentsLine(
+  doc: import("jspdf").jsPDF,
+  segments: TextSegment[],
   x: number,
   y: number,
   maxWidth: number,
-  lineHeight: number
+  font: PdfFontFamily,
+  fontSize: number
 ): number {
-  const lines = doc.splitTextToSize(text, maxWidth) as string[];
+  setFont(doc, font, "normal");
+  doc.setFontSize(fontSize);
+
+  const fullText = segments.map((segment) => segment.text).join("");
+  const lines = doc.splitTextToSize(fullText, maxWidth) as string[];
+
   for (const line of lines) {
-    doc.text(line, x, y);
-    y += lineHeight;
+    let cursorX = x;
+    let remaining = line;
+
+    for (const segment of segments) {
+      if (!remaining) break;
+      if (!segment.text) continue;
+
+      const index = remaining.indexOf(segment.text);
+      if (index === -1) continue;
+
+      if (index > 0) {
+        const before = remaining.slice(0, index);
+        setFont(doc, font, "normal");
+        doc.text(before, cursorX, y);
+        cursorX += doc.getTextWidth(before);
+        remaining = remaining.slice(index);
+      }
+
+      setFont(doc, font, segment.bold ? "bold" : "normal");
+      doc.text(segment.text, cursorX, y);
+      cursorX += doc.getTextWidth(segment.text);
+      remaining = remaining.slice(segment.text.length);
+    }
+
+    if (remaining) {
+      setFont(doc, font, "normal");
+      doc.text(remaining, cursorX, y);
+    }
+
+    y += fontSize * 0.45;
   }
+
+  return y;
+}
+
+function renderMarkdownBody(
+  doc: import("jspdf").jsPDF,
+  markdown: string,
+  startY: number,
+  margin: number,
+  contentWidth: number,
+  pageHeight: number,
+  font: PdfFontFamily,
+  bodyColor: Rgb,
+  headingColor: Rgb
+): number {
+  const blocks = parseMarkdownToBlocks(markdown);
+  let y = startY;
+
+  for (const block of blocks) {
+    if (block.type === "blank") {
+      y += 2;
+      continue;
+    }
+
+    y = ensureSpace(doc, y, 12, margin, pageHeight);
+
+    if (block.type === "heading") {
+      const size = block.level <= 2 ? 12 : block.level === 3 ? 11 : 10;
+      setFont(doc, font, "bold");
+      doc.setFontSize(size);
+      doc.setTextColor(headingColor.r, headingColor.g, headingColor.b);
+      const lines = doc.splitTextToSize(block.text, contentWidth) as string[];
+      for (const line of lines) {
+        y = ensureSpace(doc, y, size * 0.5, margin, pageHeight);
+        doc.text(line, margin, y);
+        y += size * 0.5;
+      }
+      y += 2;
+      continue;
+    }
+
+    doc.setTextColor(bodyColor.r, bodyColor.g, bodyColor.b);
+    setFont(doc, font, "normal");
+    doc.setFontSize(10);
+
+    if (block.type === "list-item") {
+      y = ensureSpace(doc, y, 6, margin, pageHeight);
+      doc.text("•", margin, y);
+      y = drawSegmentsLine(doc, block.segments, margin + 4, y, contentWidth - 4, font, 10);
+      y += 1.5;
+      continue;
+    }
+
+    y = drawSegmentsLine(doc, block.segments, margin, y, contentWidth, font, 10);
+    y += 2.5;
+  }
+
   return y;
 }
 
@@ -73,15 +184,16 @@ function drawMetadataRow(
   rightLabel: string,
   rightValue: string,
   margin: number,
-  pageWidth: number
+  pageWidth: number,
+  font: PdfFontFamily
 ) {
   const mid = pageWidth / 2;
-  doc.setFont("helvetica", "normal");
+  setFont(doc, font, "normal");
   doc.setFontSize(9);
   doc.setTextColor(100, 100, 100);
   doc.text(leftLabel, margin, y);
   doc.text(rightLabel, mid, y);
-  doc.setFont("helvetica", "bold");
+  setFont(doc, font, "bold");
   doc.setTextColor(30, 30, 30);
   doc.text(leftValue, margin, y + 5);
   doc.text(rightValue, mid, y + 5);
@@ -100,29 +212,24 @@ export async function generateContractPdf(input: ContractPdfInput): Promise<Blob
   const contentWidth = pageWidth - margin * 2;
   const headerRgb = hexToRgb(settings.headerColor);
   const accentRgb = hexToRgb(settings.accentColor);
+  const bodyRgb: Rgb = { r: 40, g: 40, b: 40 };
   const reference = contractReference(contract);
 
   let y = margin;
 
-  // Company block (left)
-  doc.setFont(font, "bold");
+  setFont(doc, font, "bold");
   doc.setFontSize(18);
   doc.setTextColor(headerRgb.r, headerRgb.g, headerRgb.b);
   doc.text(settings.companyName.toUpperCase(), margin, y);
 
-  // Document label (right)
   const label = settings.documentLabel.toUpperCase();
-  doc.setFont(font, "bold");
-  doc.setFontSize(11);
-  const labelWidth = doc.getTextWidth(label) + 10;
-  const labelX = pageWidth - margin - labelWidth;
-  doc.setFillColor(accentRgb.r, accentRgb.g, accentRgb.b);
-  doc.roundedRect(labelX, y - 6, labelWidth, 10, 1, 1, "F");
-  doc.setTextColor(255, 255, 255);
-  doc.text(label, labelX + 5, y);
+  setFont(doc, font, "bold");
+  doc.setFontSize(13);
+  doc.setTextColor(accentRgb.r, accentRgb.g, accentRgb.b);
+  doc.text(label, pageWidth - margin, y, { align: "right" });
 
   y += 8;
-  doc.setFont("helvetica", "normal");
+  setFont(doc, font, "normal");
   doc.setFontSize(9);
   doc.setTextColor(80, 80, 80);
   if (settings.contactName) {
@@ -143,19 +250,18 @@ export async function generateContractPdf(input: ContractPdfInput): Promise<Blob
   doc.line(margin, y, pageWidth - margin, y);
   y += 10;
 
-  // Client block
-  doc.setFont(font, "bold");
+  setFont(doc, font, "bold");
   doc.setFontSize(10);
   doc.setTextColor(accentRgb.r, accentRgb.g, accentRgb.b);
   doc.text("CLIENT", margin, y);
   y += 6;
-  doc.setFont(font, "bold");
+  setFont(doc, font, "bold");
   doc.setFontSize(11);
   doc.setTextColor(30, 30, 30);
   doc.text(clientName, margin, y);
   y += 5;
   if (clientCompany) {
-    doc.setFont("helvetica", "normal");
+    setFont(doc, font, "normal");
     doc.setFontSize(10);
     doc.setTextColor(60, 60, 60);
     doc.text(clientCompany, margin, y);
@@ -175,7 +281,8 @@ export async function generateContractPdf(input: ContractPdfInput): Promise<Blob
     "Start Date",
     formatDate(contract.startDate),
     margin + 4,
-    pageWidth
+    pageWidth,
+    font
   );
   y = drawMetadataRow(
     doc,
@@ -185,15 +292,16 @@ export async function generateContractPdf(input: ContractPdfInput): Promise<Blob
     "Currency",
     contract.currency,
     margin + 4,
-    pageWidth
+    pageWidth,
+    font
   );
 
   if (contract.value != null) {
-    doc.setFont("helvetica", "normal");
+    setFont(doc, font, "normal");
     doc.setFontSize(9);
     doc.setTextColor(100, 100, 100);
     doc.text("Contract Value", margin + 4, y);
-    doc.setFont("helvetica", "bold");
+    setFont(doc, font, "bold");
     doc.setFontSize(10);
     doc.setTextColor(30, 30, 30);
     doc.text(formatMoney(contract.value, contract.currency), margin + 4, y + 5);
@@ -205,47 +313,27 @@ export async function generateContractPdf(input: ContractPdfInput): Promise<Blob
   doc.line(margin, y, pageWidth - margin, y);
   y += 10;
 
-  // Title
-  doc.setFont(font, "bold");
+  setFont(doc, font, "bold");
   doc.setFontSize(12);
   doc.setTextColor(headerRgb.r, headerRgb.g, headerRgb.b);
-  y = wrapText(doc, contract.title, margin, y, contentWidth, 6);
-  y += 4;
-
-  // Body
-  doc.setFont(font, "normal");
-  doc.setFontSize(10);
-  doc.setTextColor(40, 40, 40);
-  const body = (contract.content ?? contract.terms ?? "").trim();
-  const paragraphs = body.split(/\n{2,}/);
-
-  for (const paragraph of paragraphs) {
-    const cleaned = paragraph.replace(/\n/g, " ").trim();
-    if (!cleaned) continue;
-
-    if (y > pageHeight - 40) {
-      doc.addPage();
-      y = margin;
-    }
-
-    y = wrapText(doc, cleaned, margin, y, contentWidth, 5.2);
-    y += 3;
+  const titleLines = doc.splitTextToSize(contract.title, contentWidth) as string[];
+  for (const line of titleLines) {
+    doc.text(line, margin, y);
+    y += 6;
   }
+  y += 2;
 
-  // Signature block
+  const body = (contract.content ?? contract.terms ?? "").trim();
+  y = renderMarkdownBody(doc, body, y, margin, contentWidth, pageHeight, font, bodyRgb, headerRgb);
+
   if (settings.includeSignatureBlock) {
-    if (y > pageHeight - 50) {
-      doc.addPage();
-      y = margin;
-    }
-
-    y += 8;
+    y = ensureSpace(doc, y + 8, 40, margin, pageHeight);
     doc.setDrawColor(220, 220, 220);
     doc.line(margin, y, pageWidth - margin, y);
     y += 12;
 
     const colWidth = (contentWidth - 10) / 2;
-    doc.setFont("helvetica", "normal");
+    setFont(doc, font, "normal");
     doc.setFontSize(9);
     doc.setTextColor(100, 100, 100);
     doc.text("Provider signature", margin, y);
@@ -254,41 +342,42 @@ export async function generateContractPdf(input: ContractPdfInput): Promise<Blob
     doc.setDrawColor(160, 160, 160);
     doc.line(margin, y, margin + colWidth, y);
     doc.line(margin + colWidth + 10, y, pageWidth - margin, y);
+    setFont(doc, font, "normal");
     doc.setFontSize(8);
+    doc.setTextColor(80, 80, 80);
     doc.text(settings.companyName, margin, y + 5);
     doc.text(clientName, margin + colWidth + 10, y + 5);
     y += 14;
   }
 
-  // Payment / terms footer
   if (settings.paymentDetails?.trim()) {
-    if (y > pageHeight - 35) {
-      doc.addPage();
-      y = margin;
-    }
-    doc.setFont(font, "bold");
+    y = ensureSpace(doc, y + 4, 25, margin, pageHeight);
+    setFont(doc, font, "bold");
     doc.setFontSize(9);
     doc.setTextColor(accentRgb.r, accentRgb.g, accentRgb.b);
     doc.text("TERMS & PAYMENT", margin, y);
     y += 5;
-    doc.setFont("helvetica", "normal");
+    setFont(doc, font, "normal");
     doc.setFontSize(9);
     doc.setTextColor(60, 60, 60);
-    y = wrapText(doc, settings.paymentDetails.trim(), margin, y, contentWidth, 4.5);
-    y += 4;
+    const paymentLines = doc.splitTextToSize(settings.paymentDetails.trim(), contentWidth) as string[];
+    for (const line of paymentLines) {
+      y = ensureSpace(doc, y, 5, margin, pageHeight);
+      doc.text(line, margin, y);
+      y += 4.5;
+    }
   }
 
-  // Footer on every page
   const pageCount = doc.getNumberOfPages();
   for (let page = 1; page <= pageCount; page += 1) {
     doc.setPage(page);
-    doc.setFont("helvetica", "italic");
+    setFont(doc, font, "italic");
     doc.setFontSize(8);
     doc.setTextColor(120, 120, 120);
     const footer = settings.footerText;
     const footerWidth = doc.getTextWidth(footer);
     doc.text(footer, (pageWidth - footerWidth) / 2, pageHeight - 10);
-    doc.setFont("helvetica", "normal");
+    setFont(doc, font, "normal");
     doc.text(`${page} of ${pageCount}`, pageWidth - margin - 12, pageHeight - 10);
   }
 

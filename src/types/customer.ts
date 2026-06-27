@@ -70,7 +70,7 @@ export type ContractTemplateSettings = {
 export const DEFAULT_CONTRACT_SETTINGS: ContractTemplateSettings = {
   headerColor: "#111827",
   accentColor: "#1e40af",
-  fontFamily: "Helvetica, Arial, sans-serif",
+  fontFamily: "helvetica",
   logoUrl: "",
   footerText: "Thank you for your business. — Jiaminie Tech",
   includeSignatureBlock: true,
