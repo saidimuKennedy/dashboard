@@ -13,6 +13,50 @@ export const decisionRepository = {
     return { items, total };
   },
 
+  async getById(id: string) {
+    return db.decision.findFirst({
+      where: { id, deletedAt: null },
+      include: { owner: { select: { id: true, firstName: true, lastName: true } } },
+    });
+  },
+
+  async findSimilar(
+    query: { title: string; context: string; decision: string },
+    excludeId?: string,
+    limit = 5
+  ) {
+    const terms = [query.title, query.context, query.decision]
+      .join(" ")
+      .split(/\s+/)
+      .filter((w) => w.length > 3)
+      .slice(0, 8);
+
+    const orConditions = terms.flatMap((term) => [
+      { title: { contains: term, mode: "insensitive" as const } },
+      { context: { contains: term, mode: "insensitive" as const } },
+      { decision: { contains: term, mode: "insensitive" as const } },
+      { reasoning: { contains: term, mode: "insensitive" as const } },
+    ]);
+
+    return db.decision.findMany({
+      where: {
+        deletedAt: null,
+        ...(excludeId ? { id: { not: excludeId } } : {}),
+        ...(orConditions.length ? { OR: orConditions } : {}),
+      },
+      take: limit,
+      orderBy: { createdAt: "desc" },
+      select: {
+        id: true,
+        title: true,
+        decision: true,
+        status: true,
+        outcome: true,
+        createdAt: true,
+      },
+    });
+  },
+
   async create(data: {
     title: string;
     context: string;
@@ -22,6 +66,7 @@ export const decisionRepository = {
     evidence?: string;
     ownerId?: string;
     reviewDate?: Date;
+    status?: DecisionStatus;
   }) {
     return db.decision.create({ data });
   },
@@ -31,10 +76,11 @@ export const decisionRepository = {
     data: Partial<{
       title: string;
       context: string;
-      alternatives: string;
+      alternatives: string | null;
       decision: string;
-      reasoning: string;
-      outcome: string;
+      reasoning: string | null;
+      outcome: string | null;
+      evidence: string | null;
       status: DecisionStatus;
       reviewDate: Date | null;
     }>,

@@ -42,8 +42,21 @@ export const meetingsCreateFields: CreateField[] = [
 export const decisionsCreateFields: CreateField[] = [
   { name: "title", label: "Title", required: true, placeholder: "Decision title" },
   { name: "context", label: "Context", type: "textarea", required: true, placeholder: "Background and situation" },
+  { name: "alternatives", label: "Alternatives", type: "textarea", placeholder: "Options considered" },
   { name: "decision", label: "Decision", type: "textarea", required: true, placeholder: "What was decided?" },
   { name: "reasoning", label: "Reasoning", type: "textarea", placeholder: "Why this choice?" },
+  { name: "evidence", label: "Evidence", type: "textarea", placeholder: "Supporting facts or constraints" },
+  {
+    name: "status",
+    label: "Status",
+    type: "select",
+    options: [
+      { value: "PROPOSED", label: "Proposed" },
+      { value: "APPROVED", label: "Approved" },
+      { value: "IMPLEMENTED", label: "Implemented" },
+    ],
+  },
+  { name: "reviewDate", label: "Review date", type: "date", placeholder: "" },
 ];
 
 export const customersCreateFields: CreateField[] = [

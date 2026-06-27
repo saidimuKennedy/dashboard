@@ -9,6 +9,7 @@ import {
   Download,
   FileText,
   Palette,
+  Pencil,
   Shield,
   Sparkles,
   X,
@@ -390,7 +391,12 @@ export function CustomerDetailModal({ customerId, onClose }: CustomerDetailModal
               <Skeleton className="h-40 w-full" />
             </div>
           ) : tab === "overview" ? (
-            <OverviewTab customer={customer} mainContract={mainContract} contracts={contracts} />
+            <OverviewTab
+              customer={customer}
+              mainContract={mainContract}
+              contracts={contracts}
+              onUpdated={fetchCustomer}
+            />
           ) : tab === "contracts" ? (
             <ContractsTab
               contracts={contracts}
@@ -438,38 +444,163 @@ function OverviewTab({
   customer,
   mainContract,
   contracts,
+  onUpdated,
 }: {
   customer: CustomerDetail | null;
   mainContract?: CustomerContract;
   contracts: CustomerContract[];
+  onUpdated: () => void;
 }) {
+  const [editing, setEditing] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [profileDraft, setProfileDraft] = useState({
+    company: "",
+    industry: "",
+    email: "",
+    phone: "",
+    notes: "",
+  });
+
+  useEffect(() => {
+    if (!customer) return;
+    setProfileDraft({
+      company: customer.company ?? "",
+      industry: customer.industry ?? "",
+      email: customer.email ?? "",
+      phone: customer.phone ?? "",
+      notes: customer.notes ?? "",
+    });
+    setEditing(false);
+  }, [customer]);
+
+  async function saveProfile() {
+    if (!customer) return;
+    setSaving(true);
+    try {
+      const response = await fetch(`/api/v1/customers/${customer.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          company: profileDraft.company.trim() || null,
+          industry: profileDraft.industry.trim() || null,
+          email: profileDraft.email.trim() || null,
+          phone: profileDraft.phone.trim() || null,
+          notes: profileDraft.notes.trim() || null,
+        }),
+      });
+      const json = await response.json();
+      if (!json.success) {
+        toast.error(json.message ?? "Failed to update profile.");
+        return;
+      }
+      toast.success("Profile updated.");
+      setEditing(false);
+      onUpdated();
+      window.dispatchEvent(new Event("customer:updated"));
+    } catch {
+      toast.error("Failed to update profile.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  function cancelEdit() {
+    if (!customer) return;
+    setProfileDraft({
+      company: customer.company ?? "",
+      industry: customer.industry ?? "",
+      email: customer.email ?? "",
+      phone: customer.phone ?? "",
+      notes: customer.notes ?? "",
+    });
+    setEditing(false);
+  }
+
   if (!customer) return null;
+
+  const productsLabel = customer.products?.map((p) => p.product.name).join(", ") || "—";
+  const revenueLabel = customer.revenue?.length
+    ? `KES ${customer.revenue.reduce((s, r) => s + Number(r.amount), 0).toLocaleString()}`
+    : "—";
 
   return (
     <div className="grid gap-6 lg:grid-cols-2">
       <Card>
-        <CardHeader>
+        <CardHeader className="flex flex-row items-center justify-between space-y-0">
           <CardTitle className="text-base">Profile</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-2 text-sm">
-          <Row label="Industry" value={customer.industry} />
-          <Row label="Email" value={customer.email} />
-          <Row label="Phone" value={customer.phone} />
-          <Row label="Products" value={customer.products?.map((p) => p.product.name).join(", ") || "—"} />
-          <Row
-            label="Total revenue"
-            value={
-              customer.revenue?.length
-                ? `KES ${customer.revenue.reduce((s, r) => s + Number(r.amount), 0).toLocaleString()}`
-                : "—"
-            }
-          />
-          {customer.notes ? (
-            <div className="pt-2">
-              <p className="text-xs font-medium text-muted-foreground">Notes</p>
-              <p className="mt-1 whitespace-pre-wrap">{customer.notes}</p>
-            </div>
+          {!editing ? (
+            <Button variant="outline" size="sm" onClick={() => setEditing(true)}>
+              <Pencil className="mr-1 h-3.5 w-3.5" />
+              Edit
+            </Button>
           ) : null}
+        </CardHeader>
+        <CardContent className="space-y-3 text-sm">
+          {editing ? (
+            <>
+              <ProfileField label="Company">
+                <Input
+                  value={profileDraft.company}
+                  onChange={(e) => setProfileDraft((d) => ({ ...d, company: e.target.value }))}
+                  placeholder="Company name"
+                />
+              </ProfileField>
+              <ProfileField label="Industry">
+                <Input
+                  value={profileDraft.industry}
+                  onChange={(e) => setProfileDraft((d) => ({ ...d, industry: e.target.value }))}
+                  placeholder="e.g. Consultants"
+                />
+              </ProfileField>
+              <ProfileField label="Email">
+                <Input
+                  type="email"
+                  value={profileDraft.email}
+                  onChange={(e) => setProfileDraft((d) => ({ ...d, email: e.target.value }))}
+                  placeholder="email@example.com"
+                />
+              </ProfileField>
+              <ProfileField label="Phone">
+                <Input
+                  type="tel"
+                  value={profileDraft.phone}
+                  onChange={(e) => setProfileDraft((d) => ({ ...d, phone: e.target.value }))}
+                  placeholder="+254..."
+                />
+              </ProfileField>
+              <ProfileField label="Notes">
+                <Textarea
+                  value={profileDraft.notes}
+                  onChange={(e) => setProfileDraft((d) => ({ ...d, notes: e.target.value }))}
+                  rows={3}
+                  placeholder="Additional context about this customer"
+                />
+              </ProfileField>
+              <div className="flex gap-2 pt-1">
+                <Button size="sm" onClick={saveProfile} disabled={saving}>
+                  {saving ? "Saving..." : "Save"}
+                </Button>
+                <Button size="sm" variant="outline" onClick={cancelEdit} disabled={saving}>
+                  Cancel
+                </Button>
+              </div>
+            </>
+          ) : (
+            <>
+              <Row label="Company" value={customer.company} />
+              <Row label="Industry" value={customer.industry} />
+              <Row label="Email" value={customer.email} />
+              <Row label="Phone" value={customer.phone} />
+              <Row label="Products" value={productsLabel} />
+              <Row label="Total revenue" value={revenueLabel} />
+              {customer.notes ? (
+                <div className="pt-2">
+                  <p className="text-xs font-medium text-muted-foreground">Notes</p>
+                  <p className="mt-1 whitespace-pre-wrap">{customer.notes}</p>
+                </div>
+              ) : null}
+            </>
+          )}
         </CardContent>
       </Card>
 
@@ -1184,6 +1315,15 @@ function Row({ label, value }: { label: string; value: string | null | undefined
     <div className="flex justify-between gap-4">
       <span className="text-muted-foreground">{label}</span>
       <span className="text-right">{value ?? "—"}</span>
+    </div>
+  );
+}
+
+function ProfileField({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div className="space-y-1">
+      <label className="text-xs font-medium text-muted-foreground">{label}</label>
+      {children}
     </div>
   );
 }

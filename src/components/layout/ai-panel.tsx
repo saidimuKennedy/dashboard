@@ -8,6 +8,7 @@ import {
   ChevronRight,
   Copy,
   FlaskConical,
+  Gavel,
   MessageSquarePlus,
   Send,
   Sparkles,
@@ -30,8 +31,12 @@ const MEETINGS_WELCOME =
 const JOURNAL_WELCOME =
   "Tell me about your day — wins, challenges, lessons, and how you're feeling. I can turn this into a journal entry.";
 
+const DECISIONS_WELCOME =
+  "Talk through a decision — context, alternatives, tradeoffs, and when to revisit. I can log it as a structured decision record.";
+
 function getWelcomeMessage(pathname: string) {
   if (pathname.startsWith("/journal")) return JOURNAL_WELCOME;
+  if (pathname.startsWith("/decisions")) return DECISIONS_WELCOME;
   if (pathname.startsWith("/meetings")) return MEETINGS_WELCOME;
   if (pathname.startsWith("/revenue")) {
     return "Ask about MRR, runway, forecast risks, or revenue trends. Customer names are masked.";
@@ -41,6 +46,7 @@ function getWelcomeMessage(pathname: string) {
 
 function getPersona(pathname: string) {
   if (pathname.startsWith("/journal")) return "journal_assistant";
+  if (pathname.startsWith("/decisions")) return "decision_assistant";
   if (pathname.startsWith("/meetings")) return "meeting_assistant";
   if (pathname.startsWith("/revenue")) return "revenue_advisor";
   return "business_advisor";
@@ -60,6 +66,7 @@ function AiPanelInner() {
   const pathname = usePathname();
   const welcomeMessage = getWelcomeMessage(pathname);
   const isJournalPage = pathname.startsWith("/journal");
+  const isDecisionsPage = pathname.startsWith("/decisions");
   const isRevenuePage = pathname.startsWith("/revenue");
   const persona = getPersona(pathname);
   const contextKey = pathname;
@@ -68,6 +75,7 @@ function AiPanelInner() {
   const [input, setInput] = useState("");
   const [exportingResearch, setExportingResearch] = useState(false);
   const [exportingJournal, setExportingJournal] = useState(false);
+  const [exportingDecision, setExportingDecision] = useState(false);
   const { pushMessage, onInputChange, handleHistoryKeyDown } = useMessageHistory();
 
   const { messages, loading, hydrating, sendMessage, startNewChat } = useAiChat({
@@ -179,6 +187,40 @@ function AiPanelInner() {
     }
   }
 
+  async function exportToDecision() {
+    if (!canExport) {
+      toast.error("Talk through a decision with the AI before exporting.");
+      return;
+    }
+
+    setExportingDecision(true);
+    try {
+      const response = await fetch("/api/v1/decisions/from-chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ messages: exportableMessages }),
+      });
+      const json = await response.json();
+      if (!json.success) {
+        toast.error(json.message ?? "Failed to log decision.");
+        return;
+      }
+
+      window.dispatchEvent(new CustomEvent("decision:updated"));
+      toast.success("Logged to Decisions", {
+        description: json.data?.title ?? "Decision created from this chat.",
+        action: {
+          label: "View",
+          onClick: () => router.push(`/decisions?open=${json.data.id}`),
+        },
+      });
+    } catch {
+      toast.error("Failed to log decision.");
+    } finally {
+      setExportingDecision(false);
+    }
+  }
+
   async function handleNewChat() {
     await startNewChat();
     toast.success("New chat started");
@@ -212,9 +254,11 @@ function AiPanelInner() {
               <p className="text-[10px] text-muted-foreground">
                 {isJournalPage
                   ? "Journal coach"
-                  : isRevenuePage
-                    ? "Revenue advisor"
-                    : "Context-aware insights"}
+                  : isDecisionsPage
+                    ? "Decision coach"
+                    : isRevenuePage
+                      ? "Revenue advisor"
+                      : "Context-aware insights"}
               </p>
             </div>
           </div>
@@ -252,6 +296,16 @@ function AiPanelInner() {
               variant="ghost"
               size="icon"
               className="h-8 w-8"
+              onClick={exportToDecision}
+              disabled={!canExport || exportingDecision}
+              title="Log as decision"
+            >
+              <Gavel className="h-3.5 w-3.5" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-8 w-8"
               onClick={exportToResearch}
               disabled={!canExport || exportingResearch}
               title="Export as research item"
@@ -280,6 +334,18 @@ function AiPanelInner() {
         <div className="space-y-2 border-t border-border p-3">
           {canExport ? (
             <div className="grid gap-2">
+              {isDecisionsPage ? (
+                <Button
+                  variant="default"
+                  size="sm"
+                  className="w-full"
+                  onClick={exportToDecision}
+                  loading={exportingDecision}
+                >
+                  <Gavel className="h-3.5 w-3.5" />
+                  Log as decision
+                </Button>
+              ) : null}
               <Button
                 variant={isJournalPage ? "default" : "outline"}
                 size="sm"
@@ -290,7 +356,7 @@ function AiPanelInner() {
                 <BookOpen className="h-3.5 w-3.5" />
                 Save as journal entry
               </Button>
-              {!isJournalPage ? (
+              {!isJournalPage && !isDecisionsPage ? (
                 <Button
                   variant="outline"
                   size="sm"
@@ -315,7 +381,7 @@ function AiPanelInner() {
                   handleSend();
                 }
               }}
-              placeholder={isJournalPage ? "Reflect on your day…" : "Ask JIP anything…"}
+              placeholder={isJournalPage ? "Reflect on your day…" : isDecisionsPage ? "Talk through a decision…" : "Ask JIP anything…"}
               rows={2}
               className="min-h-0 resize-none text-sm"
             />

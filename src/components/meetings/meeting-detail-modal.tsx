@@ -1,10 +1,12 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import {
   Calendar,
   CheckCircle2,
   Copy,
+  Gavel,
   MapPin,
   Sparkles,
   Video,
@@ -47,10 +49,11 @@ const outcomeStyles: Record<string, string> = {
 };
 
 export function MeetingDetailModal({ meetingId, onClose }: MeetingDetailModalProps) {
+  const router = useRouter();
   const [meeting, setMeeting] = useState<MeetingDetail | null>(null);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [aiLoading, setAiLoading] = useState<"summary" | "actions" | "evaluate" | null>(null);
+  const [aiLoading, setAiLoading] = useState<"summary" | "actions" | "evaluate" | "decisions" | null>(null);
   const [draft, setDraft] = useState({
     agenda: "",
     minutes: "",
@@ -134,10 +137,39 @@ export function MeetingDetailModal({ meetingId, onClose }: MeetingDetailModalPro
     }
   }
 
-  async function runAi(task: "summary" | "actions" | "evaluate") {
+  async function runAi(task: "summary" | "actions" | "evaluate" | "decisions") {
     if (!meetingId) return;
     setAiLoading(task);
     try {
+      if (task === "decisions") {
+        const response = await fetch("/api/v1/decisions/from-meeting", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ meetingId }),
+        });
+        const json = await response.json();
+        if (!json.success) {
+          toast.error(json.message ?? "Failed to extract decisions.");
+          return;
+        }
+        const count = json.data?.count ?? 0;
+        if (count === 0) {
+          toast.message("No decisions found in this meeting.");
+          return;
+        }
+        window.dispatchEvent(new CustomEvent("decision:updated"));
+        toast.success(count === 1 ? "1 decision logged." : `${count} decisions logged.`, {
+          action: {
+            label: "View",
+            onClick: () => {
+              const firstId = json.data?.items?.[0]?.id;
+              router.push(firstId ? `/decisions?open=${firstId}` : "/decisions");
+            },
+          },
+        });
+        return;
+      }
+
       const endpoint =
         task === "summary"
           ? "/api/v1/meetings/summary"
@@ -394,6 +426,15 @@ export function MeetingDetailModal({ meetingId, onClose }: MeetingDetailModalPro
                       onClick={() => runAi("evaluate")}
                     >
                       {aiLoading === "evaluate" ? "Evaluating..." : "Evaluate success"}
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      disabled={aiLoading !== null}
+                      onClick={() => runAi("decisions")}
+                    >
+                      <Gavel className="mr-1 h-3.5 w-3.5" />
+                      {aiLoading === "decisions" ? "Extracting..." : "Log decisions"}
                     </Button>
                   </div>
 

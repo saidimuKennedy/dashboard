@@ -7,6 +7,12 @@ import { decisionRepository } from "@/server/repositories/domains.repository";
 import { auditLog } from "@/lib/logger/audit";
 import { db } from "@/lib/db";
 
+export const GET = withAuth(async (_request, { params }) => {
+  const decision = await decisionRepository.getById(params!.id);
+  if (!decision) return notFound("Decision not found.");
+  return success(decision);
+});
+
 export const PATCH = withAuth(async (request, { user, params }) => {
   const parsed = await parseBody(request, updateDecisionSchema);
   if (!parsed.ok) return parsed.response;

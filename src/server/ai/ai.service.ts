@@ -5,6 +5,12 @@ import { analyzeResearchFromChat } from "@/server/ai/research-analysis";
 import { analyzeJournalFromChat } from "@/server/ai/journal-analysis";
 import { evaluateMeetingFromReport } from "@/server/ai/meeting-analysis";
 import {
+  analyzeDecisionFromChat,
+  extractDecisionsFromMeeting,
+  runDecisionPremortem,
+  summarizeSimilarDecisions,
+} from "@/server/ai/decision-analysis";
+import {
   analyzeCustomerProfile,
   analyzeCustomerPortfolio,
   generateContractContent,
@@ -43,6 +49,7 @@ const PROMPTS: Record<string, string> = {
   revenue_advisor: "You are a revenue analyst. Analyze financial trends and provide forecasts.",
   founder_brief: "Generate a concise daily executive brief for the founder highlighting priorities, risks, and opportunities.",
   journal_assistant: "You are a founder journal coach. Help the founder reflect on their day — wins, challenges, lessons, and mood. Ask clarifying questions when useful and write in a warm, concise tone.",
+  decision_assistant: "You are a decision-log coach for a founder. Help clarify context, alternatives, tradeoffs, and reasoning before logging a decision. Ask probing questions about assumptions, risks, and when to revisit the choice.",
   customer_success_advisor: "You are a customer success advisor. Discuss customers ONLY by their assigned alias. Never ask for or reference real names, emails, phone numbers, or company names. Provide deal insights, product recommendations, and contract advice based on masked profile data.",
 };
 
@@ -196,6 +203,58 @@ export const aiService = {
 
   async analyzeJournalChat(messages: ResearchChatMessage[]) {
     return analyzeJournalFromChat(callDeepSeek, messages);
+  },
+
+  async analyzeDecisionChat(messages: ResearchChatMessage[]) {
+    return analyzeDecisionFromChat(callDeepSeek, messages);
+  },
+
+  async extractMeetingDecisions(meeting: {
+    title: string;
+    agenda?: string | null;
+    outcomeReport?: string | null;
+    minutes?: string | null;
+    transcript?: string | null;
+    aiSummary?: string | null;
+  }) {
+    return extractDecisionsFromMeeting(callDeepSeek, meeting);
+  },
+
+  async premortemDecision(input: {
+    title: string;
+    context: string;
+    decision: string;
+    alternatives?: string;
+    reasoning?: string;
+  }) {
+    return runDecisionPremortem(callDeepSeek, input);
+  },
+
+  async findSimilarDecisions(
+    query: { title: string; context: string; decision: string },
+    excludeId?: string
+  ) {
+    const { decisionRepository } = await import("@/server/repositories/domains.repository");
+    const candidates = await decisionRepository.findSimilar(query, excludeId, 5);
+    if (!candidates.length) return { items: [], tokens: 0 };
+
+    const { relevance, tokens } = await summarizeSimilarDecisions(
+      callDeepSeek,
+      query,
+      candidates.map((c) => ({
+        title: c.title,
+        decision: c.decision,
+        outcome: c.outcome,
+      }))
+    );
+
+    return {
+      items: candidates.map((c, i) => ({
+        ...c,
+        relevance: relevance[i] ?? "Related past decision.",
+      })),
+      tokens,
+    };
   },
 
   async chatWithMaskedCustomer(

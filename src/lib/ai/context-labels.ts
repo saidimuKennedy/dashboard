@@ -32,6 +32,8 @@ export function getPersonaLabel(persona?: string | null): string {
       return "Revenue advisor";
     case "meeting_assistant":
       return "Meeting assistant";
+    case "decision_assistant":
+      return "Decision coach";
     default:
       return persona?.replace(/_/g, " ") ?? "Assistant";
   }

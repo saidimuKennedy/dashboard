@@ -26,7 +26,7 @@ import {
 export type CreateField = {
   name: string;
   label: string;
-  type?: "text" | "textarea" | "number" | "select" | "datetime-local";
+  type?: "text" | "textarea" | "number" | "select" | "datetime-local" | "date";
   required?: boolean;
   placeholder?: string;
   options?: Array<{ value: string; label: string }>;
