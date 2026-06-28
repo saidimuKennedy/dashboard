@@ -443,9 +443,10 @@ export const researchRepository = {
     id: string,
     data: Partial<{
       title: string;
-      description: string;
+      description: string | null;
       stage: ResearchStage;
-      notes: string;
+      notes: string | null;
+      summary: string | null;
       productId: string | null;
     }>,
     userId: string

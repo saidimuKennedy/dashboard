@@ -34,6 +34,34 @@ export type ResearchTopicDetail = {
   };
 };
 
+export const RESEARCH_STAGE_LABELS: Record<string, string> = {
+  IDEA: "Idea",
+  RESEARCHING: "Researching",
+  EXPERIMENTING: "Experimenting",
+  VALIDATED: "Validated",
+  IMPLEMENTED: "Implemented",
+  ARCHIVED: "Archived",
+};
+
+export const RESEARCH_STAGE_OPTIONS = Object.entries(RESEARCH_STAGE_LABELS).map(
+  ([value, label]) => ({ value, label })
+);
+
+const RESEARCH_STAGE_ORDER = [
+  "IDEA",
+  "RESEARCHING",
+  "EXPERIMENTING",
+  "VALIDATED",
+  "IMPLEMENTED",
+  "ARCHIVED",
+] as const;
+
+export function getNextResearchStage(current: string): string | null {
+  const index = RESEARCH_STAGE_ORDER.indexOf(current as (typeof RESEARCH_STAGE_ORDER)[number]);
+  if (index < 0 || index >= RESEARCH_STAGE_ORDER.length - 2) return null;
+  return RESEARCH_STAGE_ORDER[index + 1];
+}
+
 export function formatChatTranscript(messages: ResearchChatMessage[]): string {
   return messages
     .map((message) => {

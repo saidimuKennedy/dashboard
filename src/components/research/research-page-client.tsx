@@ -25,7 +25,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { researchCreateFields } from "@/config/module-create-fields";
-import { parseResearchAiAnalysis } from "@/types/research";
+import { parseResearchAiAnalysis, RESEARCH_STAGE_LABELS } from "@/types/research";
 
 type ResearchListItem = {
   id: string;
@@ -197,6 +197,14 @@ export function ResearchPageClient() {
                 key={item.id}
                 className="cursor-pointer hover:bg-muted/40"
                 onClick={() => setSelectedId(item.id)}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter" || event.key === " ") {
+                    event.preventDefault();
+                    setSelectedId(item.id);
+                  }
+                }}
+                role="button"
+                tabIndex={0}
               >
                 <TableCell className="font-medium">{item.title}</TableCell>
                 <TableCell>
@@ -207,7 +215,13 @@ export function ResearchPageClient() {
                   )}
                 </TableCell>
                 <TableCell>
-                  {item.stage ? <Badge variant="secondary">{item.stage}</Badge> : "—"}
+                  {item.stage ? (
+                    <Badge variant="secondary">
+                      {RESEARCH_STAGE_LABELS[item.stage] ?? item.stage}
+                    </Badge>
+                  ) : (
+                    "—"
+                  )}
                 </TableCell>
                 <TableCell className="text-muted-foreground">
                   {item.updatedAt

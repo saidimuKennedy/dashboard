@@ -10,8 +10,9 @@ export const createResearchSchema = z.object({
 
 export const updateResearchSchema = z.object({
   title: z.string().min(1).optional(),
-  description: z.string().optional(),
-  notes: z.string().optional(),
+  description: z.string().optional().nullable(),
+  notes: z.string().optional().nullable(),
+  summary: z.string().optional().nullable(),
   productId: z.string().uuid().optional().nullable(),
   stage: z.nativeEnum(ResearchStage).optional(),
 });

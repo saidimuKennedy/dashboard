@@ -9,6 +9,7 @@ import {
   FlaskConical,
   GripHorizontal,
   Lightbulb,
+  Sparkles,
   Target,
   Users,
   Wallet,
@@ -19,12 +20,17 @@ import { AiMessageContent } from "@/components/ai/ai-message-content";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
 import {
   formatChatTranscript,
+  getNextResearchStage,
   parseResearchAiAnalysis,
   parseSourceChat,
+  RESEARCH_STAGE_LABELS,
+  RESEARCH_STAGE_OPTIONS,
   type ResearchAiAnalysis,
   type ResearchTopicDetail,
 } from "@/types/research";
@@ -49,11 +55,42 @@ const KPI_COLLAPSE_THRESHOLD = 72;
 export function ResearchDetailModal({ researchId, onClose }: ResearchDetailModalProps) {
   const [topic, setTopic] = useState<ResearchTopicDetail | null>(null);
   const [loading, setLoading] = useState(false);
-  const [view, setView] = useState<"overview" | "chat">("overview");
+  const [saving, setSaving] = useState(false);
+  const [actionLoading, setActionLoading] = useState<string | null>(null);
+  const [view, setView] = useState<"details" | "analysis" | "chat">("details");
   const [kpiCollapsed, setKpiCollapsed] = useState(false);
   const [kpiHeight, setKpiHeight] = useState(KPI_EXPANDED_DEFAULT);
+  const [draft, setDraft] = useState({
+    title: "",
+    description: "",
+    notes: "",
+    stage: "IDEA",
+  });
   const bodyRef = useRef<HTMLDivElement>(null);
   const draggingRef = useRef(false);
+
+  const fetchTopic = useCallback(() => {
+    if (!researchId) return;
+    setLoading(true);
+    fetch(`/api/v1/research/${researchId}`)
+      .then((res) => res.json())
+      .then((json) => {
+        if (!json.success) {
+          toast.error(json.message ?? "Failed to load research item.");
+          return;
+        }
+        const data = json.data as ResearchTopicDetail;
+        setTopic(data);
+        setDraft({
+          title: data.title,
+          description: data.description ?? "",
+          notes: data.notes ?? "",
+          stage: data.stage,
+        });
+      })
+      .catch(() => toast.error("Failed to load research item."))
+      .finally(() => setLoading(false));
+  }, [researchId]);
 
   useEffect(() => {
     if (!researchId) {
@@ -61,19 +98,11 @@ export function ResearchDetailModal({ researchId, onClose }: ResearchDetailModal
       return;
     }
 
-    setLoading(true);
-    setView("overview");
+    setView("details");
     setKpiCollapsed(false);
     setKpiHeight(KPI_EXPANDED_DEFAULT);
-    fetch(`/api/v1/research/${researchId}`)
-      .then((res) => res.json())
-      .then((json) => {
-        if (json.success) setTopic(json.data);
-        else toast.error(json.message ?? "Failed to load research item.");
-      })
-      .catch(() => toast.error("Failed to load research item."))
-      .finally(() => setLoading(false));
-  }, [researchId]);
+    fetchTopic();
+  }, [researchId, fetchTopic]);
 
   const toggleKpiCollapsed = useCallback(() => {
     setKpiCollapsed((current) => !current);
@@ -112,6 +141,108 @@ export function ResearchDetailModal({ researchId, onClose }: ResearchDetailModal
 
   const analysis = parseResearchAiAnalysis(topic?.aiAnalysis);
   const sourceChat = parseSourceChat(topic?.sourceChat);
+  const nextStage = topic ? getNextResearchStage(topic.stage) : null;
+  const isArchived = topic?.stage === "ARCHIVED";
+
+  async function saveTopic() {
+    if (!researchId) return;
+    setSaving(true);
+    try {
+      const response = await fetch(`/api/v1/research/${researchId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          title: draft.title.trim(),
+          description: draft.description.trim() || null,
+          notes: draft.notes.trim() || null,
+          stage: draft.stage,
+        }),
+      });
+      const json = await response.json();
+      if (!json.success) {
+        toast.error(json.message ?? "Failed to save research topic.");
+        return;
+      }
+      toast.success("Research topic saved.");
+      fetchTopic();
+      window.dispatchEvent(new CustomEvent("research:updated"));
+    } catch {
+      toast.error("Failed to save research topic.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function runPipelineAction(
+    action: "advance" | "validate" | "archive",
+    endpoint?: string,
+    patch?: { stage: string }
+  ) {
+    if (!researchId) return;
+    setActionLoading(action);
+    try {
+      if (patch) {
+        const response = await fetch(`/api/v1/research/${researchId}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(patch),
+        });
+        const json = await response.json();
+        if (!json.success) {
+          toast.error(json.message ?? "Failed to update stage.");
+          return;
+        }
+        toast.success(`Moved to ${RESEARCH_STAGE_LABELS[patch.stage] ?? patch.stage}.`);
+      } else if (endpoint) {
+        const response = await fetch(endpoint, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ id: researchId }),
+        });
+        const json = await response.json();
+        if (!json.success) {
+          toast.error(json.message ?? "Action failed.");
+          return;
+        }
+        toast.success(json.message ?? "Updated.");
+      }
+      fetchTopic();
+      window.dispatchEvent(new CustomEvent("research:updated"));
+    } catch {
+      toast.error("Action failed.");
+    } finally {
+      setActionLoading(null);
+    }
+  }
+
+  async function summarizeTopic() {
+    if (!researchId) return;
+    setActionLoading("summarize");
+    try {
+      const response = await fetch("/api/v1/research/summarize", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: researchId }),
+      });
+      const json = await response.json();
+      if (!json.success) {
+        toast.error(json.message ?? "Summarize failed.");
+        return;
+      }
+      const summary = json.data?.response ?? json.data?.summary ?? "";
+      if (summary) {
+        setDraft((current) => ({
+          ...current,
+          notes: current.notes ? `${current.notes}\n\n${summary}` : summary,
+        }));
+        toast.success("Summary added to notes — save to keep it.");
+      }
+    } catch {
+      toast.error("Summarize failed.");
+    } finally {
+      setActionLoading(null);
+    }
+  }
 
   async function copyChat() {
     const transcript = sourceChat?.length
@@ -149,6 +280,39 @@ export function ResearchDetailModal({ researchId, onClose }: ResearchDetailModal
             )}
           </div>
           <div className="flex shrink-0 items-center gap-2">
+            {!isArchived && nextStage ? (
+              <Button
+                variant="outline"
+                size="sm"
+                loading={actionLoading === "advance"}
+                disabled={!!actionLoading || saving}
+                onClick={() => runPipelineAction("advance", undefined, { stage: nextStage })}
+              >
+                Advance to {RESEARCH_STAGE_LABELS[nextStage]}
+              </Button>
+            ) : null}
+            {!isArchived && topic?.stage !== "VALIDATED" && topic?.stage !== "IMPLEMENTED" ? (
+              <Button
+                variant="outline"
+                size="sm"
+                loading={actionLoading === "validate"}
+                disabled={!!actionLoading || saving}
+                onClick={() => runPipelineAction("validate", "/api/v1/research/complete")}
+              >
+                Mark validated
+              </Button>
+            ) : null}
+            {!isArchived ? (
+              <Button
+                variant="outline"
+                size="sm"
+                loading={actionLoading === "archive"}
+                disabled={!!actionLoading || saving}
+                onClick={() => runPipelineAction("archive", "/api/v1/research/archive")}
+              >
+                Archive
+              </Button>
+            ) : null}
             {sourceChat?.length || topic?.notes ? (
               <Button variant="outline" size="sm" onClick={copyChat}>
                 <Copy className="h-3.5 w-3.5" />
@@ -253,14 +417,28 @@ export function ResearchDetailModal({ researchId, onClose }: ResearchDetailModal
                   type="button"
                   className={cn(
                     "border-b-2 px-3 py-2 text-sm font-medium transition-colors",
-                    view === "overview"
+                    view === "details"
                       ? "border-primary text-foreground"
                       : "border-transparent text-muted-foreground hover:text-foreground"
                   )}
-                  onClick={() => setView("overview")}
+                  onClick={() => setView("details")}
                 >
-                  Overview
+                  Details
                 </button>
+                {analysis ? (
+                  <button
+                    type="button"
+                    className={cn(
+                      "border-b-2 px-3 py-2 text-sm font-medium transition-colors",
+                      view === "analysis"
+                        ? "border-primary text-foreground"
+                        : "border-transparent text-muted-foreground hover:text-foreground"
+                    )}
+                    onClick={() => setView("analysis")}
+                  >
+                    AI analysis
+                  </button>
+                ) : null}
                 <button
                   type="button"
                   className={cn(
@@ -276,7 +454,64 @@ export function ResearchDetailModal({ researchId, onClose }: ResearchDetailModal
               </div>
 
               <div className="min-h-0 flex-1 overflow-y-auto p-6">
-                {view === "overview" ? (
+                {view === "details" ? (
+                  <div className="space-y-4">
+                    <Field label="Title">
+                      <Input
+                        value={draft.title}
+                        onChange={(e) => setDraft((c) => ({ ...c, title: e.target.value }))}
+                        disabled={isArchived}
+                      />
+                    </Field>
+                    <Field label="Description">
+                      <Textarea
+                        rows={3}
+                        value={draft.description}
+                        onChange={(e) => setDraft((c) => ({ ...c, description: e.target.value }))}
+                        placeholder="What are you exploring?"
+                        disabled={isArchived}
+                      />
+                    </Field>
+                    <Field label="Notes">
+                      <Textarea
+                        rows={5}
+                        value={draft.notes}
+                        onChange={(e) => setDraft((c) => ({ ...c, notes: e.target.value }))}
+                        placeholder="Findings, links, observations…"
+                        disabled={isArchived}
+                      />
+                    </Field>
+                    <Field label="Stage">
+                      <select
+                        className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                        value={draft.stage}
+                        onChange={(e) => setDraft((c) => ({ ...c, stage: e.target.value }))}
+                        disabled={isArchived}
+                      >
+                        {RESEARCH_STAGE_OPTIONS.map((option) => (
+                          <option key={option.value} value={option.value}>
+                            {option.label}
+                          </option>
+                        ))}
+                      </select>
+                    </Field>
+                    <div className="flex flex-wrap gap-2">
+                      <Button size="sm" onClick={saveTopic} loading={saving} disabled={isArchived}>
+                        Save changes
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={summarizeTopic}
+                        loading={actionLoading === "summarize"}
+                        disabled={!!actionLoading || saving || isArchived}
+                      >
+                        <Sparkles className="mr-1 h-3.5 w-3.5" />
+                        AI summarize
+                      </Button>
+                    </div>
+                  </div>
+                ) : view === "analysis" ? (
                   <div className="space-y-6">
                     {analysis ? (
                       <>
@@ -297,11 +532,13 @@ export function ResearchDetailModal({ researchId, onClose }: ResearchDetailModal
                       </>
                     ) : (
                       <p className="text-sm text-muted-foreground">
-                        {topic?.description ?? topic?.summary ?? "No AI analysis available for this item."}
+                        No AI analysis for this topic yet. Use the Details tab to edit, or export a
+                        research chat from the AI panel.
                       </p>
                     )}
                   </div>
-                ) : sourceChat?.length ? (
+                ) : view === "chat" ? (
+                  sourceChat?.length ? (
                   <div className="space-y-3">
                     {sourceChat.map((message, index) => (
                       <div
@@ -323,7 +560,8 @@ export function ResearchDetailModal({ researchId, onClose }: ResearchDetailModal
                   </div>
                 ) : (
                   <p className="text-sm text-muted-foreground">No chat transcript saved for this item.</p>
-                )}
+                )
+                ) : null}
               </div>
             </div>
           </div>
@@ -433,5 +671,14 @@ function Section({
         </ul>
       )}
     </section>
+  );
+}
+
+function Field({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div className="space-y-1">
+      <label className="text-xs font-medium text-muted-foreground">{label}</label>
+      {children}
+    </div>
   );
 }
