@@ -25,6 +25,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { researchCreateFields } from "@/config/module-create-fields";
+import { DesktopTableShell, MobileRecordList, PageHeader } from "@/components/ui/responsive-data-list";
 import { parseResearchAiAnalysis, RESEARCH_STAGE_LABELS } from "@/types/research";
 
 type ResearchListItem = {
@@ -178,7 +179,7 @@ export function ResearchPageClient() {
   ) : null;
 
   const table = (
-    <div className="rounded-xl border border-border">
+    <DesktopTableShell>
       <Table>
         <TableHeader>
           <TableRow>
@@ -238,23 +239,56 @@ export function ResearchPageClient() {
           })}
         </TableBody>
       </Table>
-    </div>
+    </DesktopTableShell>
+  );
+
+  const mobileList = (
+    <MobileRecordList
+      items={items}
+      keyExtractor={(item) => item.id}
+      onItemClick={(item) => setSelectedId(item.id)}
+      renderItem={(item) => {
+        const analysis = parseResearchAiAnalysis(item.aiAnalysis);
+        return (
+          <div className="space-y-2">
+            <p className="font-medium">{item.title}</p>
+            <div className="flex flex-wrap items-center gap-2 text-sm">
+              {analysis ? (
+                <Badge variant="secondary">{analysis.importanceScore}/100</Badge>
+              ) : null}
+              {item.stage ? (
+                <Badge variant="secondary">
+                  {RESEARCH_STAGE_LABELS[item.stage] ?? item.stage}
+                </Badge>
+              ) : null}
+              <span className="text-muted-foreground">
+                {item.updatedAt
+                  ? new Date(item.updatedAt).toLocaleDateString()
+                  : item.createdAt
+                    ? new Date(item.createdAt).toLocaleDateString()
+                    : "—"}
+              </span>
+              {item.author?.firstName ? (
+                <span className="text-muted-foreground">{item.author.firstName}</span>
+              ) : null}
+            </div>
+          </div>
+        );
+      }}
+    />
   );
 
   if (!loading && items.length > 0) {
     return (
       <>
         <div className="space-y-6">
-          <div className="flex items-start justify-between gap-4">
-            <div>
-              <h1 className="text-xl font-semibold tracking-tight">Research</h1>
-              <p className="mt-1 text-sm text-muted-foreground">
-                Track market research, competitive analysis, and product discovery.
-              </p>
-            </div>
-            <Button onClick={openCreateForm}>New Research Topic</Button>
-          </div>
+          <PageHeader
+            title="Research"
+            description="Track market research, competitive analysis, and product discovery."
+            action={<Button onClick={openCreateForm}>New Research Topic</Button>}
+          />
           {createForm}
+          {mobileList}
           {table}
         </div>
         <ResearchDetailModal researchId={selectedId} onClose={() => setSelectedId(null)} />

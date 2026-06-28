@@ -23,6 +23,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
+import { DesktopTableShell, MobileRecordList, PageHeader } from "@/components/ui/responsive-data-list";
 
 export type RowRenderContext = {
   onRowClick?: () => void;
@@ -301,15 +302,40 @@ export function ModulePageClient({
   if (!loading && items.length > 0) {
     return (
       <div className="space-y-6">
-        <div className="flex items-start justify-between gap-4">
-          <div>
-            <h1 className="text-xl font-semibold tracking-tight">{title}</h1>
-            <p className="mt-1 text-sm text-muted-foreground">{description}</p>
-          </div>
-          {createEnabled ? <Button onClick={openCreateForm}>{ctaLabel}</Button> : null}
-        </div>
+        <PageHeader
+          title={title}
+          description={description}
+          action={createEnabled ? <Button onClick={openCreateForm}>{ctaLabel}</Button> : undefined}
+        />
         {createForm}
-        <div className="rounded-xl border border-border">
+        <MobileRecordList
+          items={items}
+          keyExtractor={(item) => String(item.id)}
+          onItemClick={onRowClick ? (item) => onRowClick(item) : undefined}
+          renderItem={(item) => (
+            <div className="space-y-2">
+              <p className="font-medium">{String(item.title ?? item.name ?? "—")}</p>
+              <div className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
+                {item.status || item.stage ? (
+                  <Badge variant="secondary">{String(item.status ?? item.stage)}</Badge>
+                ) : null}
+                <span>
+                  {item.updatedAt
+                    ? new Date(String(item.updatedAt)).toLocaleDateString()
+                    : item.createdAt
+                      ? new Date(String(item.createdAt)).toLocaleDateString()
+                      : "—"}
+                </span>
+                <span>
+                  {String(
+                    (item.author as { firstName?: string })?.firstName ?? item.owner ?? "—"
+                  )}
+                </span>
+              </div>
+            </div>
+          )}
+        />
+        <DesktopTableShell>
           <Table>
             <TableHeader>
               <TableRow>
@@ -329,7 +355,7 @@ export function ModulePageClient({
               })}
             </TableBody>
           </Table>
-        </div>
+        </DesktopTableShell>
       </div>
     );
   }

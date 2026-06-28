@@ -18,6 +18,11 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Textarea } from "@/components/ui/textarea";
+import {
+  DetailModalShell,
+  detailModalActionsClassName,
+  detailModalHeaderClassName,
+} from "@/components/ui/detail-modal-shell";
 import { cn } from "@/lib/utils";
 import {
   MEETING_OUTCOME_LABELS,
@@ -279,16 +284,9 @@ export function MeetingDetailModal({ meetingId, onClose }: MeetingDetailModalPro
     customers.find((c) => c.id === draft.customerId) ?? meeting?.customer ?? null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      <button
-        type="button"
-        className="absolute inset-0 bg-background/80 backdrop-blur-sm"
-        onClick={onClose}
-        aria-label="Close meeting details"
-      />
-      <div className="relative z-10 flex max-h-[92vh] w-full max-w-5xl flex-col overflow-hidden border border-border bg-card shadow-2xl">
-        <div className="flex shrink-0 items-start justify-between gap-4 border-b border-border px-6 py-4">
-          <div className="min-w-0">
+    <DetailModalShell onClose={onClose} closeLabel="Close meeting details" maxWidth="5xl">
+        <div className={detailModalHeaderClassName()}>
+          <div className="min-w-0 flex-1">
             {loading ? (
               <Skeleton className="h-6 w-64" />
             ) : (
@@ -321,7 +319,7 @@ export function MeetingDetailModal({ meetingId, onClose }: MeetingDetailModalPro
               </>
             )}
           </div>
-          <div className="flex shrink-0 items-center gap-2">
+          <div className={detailModalActionsClassName()}>
             {draft.meetingUrl ? (
               <>
                 <Button variant="outline" size="sm" onClick={copyJoinUrl}>
@@ -637,8 +635,7 @@ export function MeetingDetailModal({ meetingId, onClose }: MeetingDetailModalPro
             </div>
           </div>
         )}
-      </div>
-    </div>
+    </DetailModalShell>
   );
 }
 

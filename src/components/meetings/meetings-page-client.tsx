@@ -27,6 +27,7 @@ import {
   type MeetingListItem,
 } from "@/types/meeting";
 import { cn } from "@/lib/utils";
+import { DesktopTableShell, MobileRecordList, PageHeader } from "@/components/ui/responsive-data-list";
 
 const statusStyles: Record<string, string> = {
   SCHEDULED: "bg-primary/15 text-primary border-primary/30",
@@ -321,32 +322,28 @@ export function MeetingsPageClient() {
   return (
     <>
       <div className="space-y-6">
-        <div className="flex flex-wrap items-start justify-between gap-4">
-          <div>
-            <h1 className="text-xl font-semibold tracking-tight">Meetings</h1>
-            <p className="mt-1 text-sm text-muted-foreground">
-              Agendas, join links, outcome reports, and AI success reviews.
-            </p>
-          </div>
-          <div className="flex flex-wrap gap-2">
-            {calendarConfigured ? (
-              calendarConnected ? (
-                <Button variant="outline" onClick={syncGoogleCalendar} disabled={syncing}>
-                  <RefreshCw className={cn("mr-1 h-4 w-4", syncing && "animate-spin")} />
-                  Sync calendar
-                </Button>
-              ) : (
-                <Button variant="outline" onClick={connectGoogleCalendar}>
-                  <Calendar className="mr-1 h-4 w-4" />
-                  Connect Google Calendar
-                </Button>
-              )
-            ) : null}
-            {!creating ? (
-              <Button onClick={openCreateForm}>Schedule Meeting</Button>
-            ) : null}
-          </div>
-        </div>
+        <PageHeader
+          title="Meetings"
+          description="Agendas, join links, outcome reports, and AI success reviews."
+          action={
+            <div className="flex flex-wrap gap-2">
+              {calendarConfigured ? (
+                calendarConnected ? (
+                  <Button variant="outline" onClick={syncGoogleCalendar} disabled={syncing}>
+                    <RefreshCw className={cn("mr-1 h-4 w-4", syncing && "animate-spin")} />
+                    Sync calendar
+                  </Button>
+                ) : (
+                  <Button variant="outline" onClick={connectGoogleCalendar}>
+                    <Calendar className="mr-1 h-4 w-4" />
+                    Connect Google Calendar
+                  </Button>
+                )
+              ) : null}
+              {!creating ? <Button onClick={openCreateForm}>Schedule Meeting</Button> : null}
+            </div>
+          }
+        />
 
         <UpcomingMeetings
           meetings={upcoming}
@@ -359,59 +356,94 @@ export function MeetingsPageClient() {
         {loading ? (
           <Skeleton className="h-64 w-full" />
         ) : items.length > 0 ? (
-          <div className="border border-border">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Title</TableHead>
-                  <TableHead>Type</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Scheduled</TableHead>
-                  <TableHead>Customer</TableHead>
-                  <TableHead className="w-20">Join</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {items.map((item) => (
-                  <TableRow
-                    key={item.id}
-                    className="cursor-pointer"
-                    onClick={() => setSelectedId(item.id)}
-                  >
-                    <TableCell className="font-medium">{item.title}</TableCell>
-                    <TableCell>
-                      <Badge variant="secondary">{MEETING_TYPE_LABELS[item.type]}</Badge>
-                    </TableCell>
-                    <TableCell>
-                      <Badge className={cn("capitalize", statusStyles[item.status])}>
-                        {MEETING_STATUS_LABELS[item.status]}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="text-muted-foreground">
-                      {formatScheduled(item.scheduledAt)}
-                    </TableCell>
-                    <TableCell>{item.customer?.name ?? "—"}</TableCell>
-                    <TableCell>
-                      {item.meetingUrl ? (
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            window.open(item.meetingUrl!, "_blank");
-                          }}
-                        >
-                          <Video className="h-4 w-4" />
-                        </Button>
-                      ) : (
-                        "—"
-                      )}
-                    </TableCell>
+          <>
+            <MobileRecordList
+              items={items}
+              keyExtractor={(item) => item.id}
+              onItemClick={(item) => setSelectedId(item.id)}
+              renderItem={(item) => (
+                <div className="space-y-2">
+                  <div className="flex items-start justify-between gap-2">
+                    <p className="font-medium">{item.title}</p>
+                    {item.meetingUrl ? (
+                      <a
+                        href={item.meetingUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        onClick={(e) => e.stopPropagation()}
+                        className="inline-flex h-8 items-center justify-center rounded-md border border-input px-2 text-sm"
+                      >
+                        <Video className="h-4 w-4" />
+                      </a>
+                    ) : null}
+                  </div>
+                  <div className="flex flex-wrap items-center gap-2 text-sm">
+                    <Badge variant="secondary">{MEETING_TYPE_LABELS[item.type]}</Badge>
+                    <Badge className={cn("capitalize", statusStyles[item.status])}>
+                      {MEETING_STATUS_LABELS[item.status]}
+                    </Badge>
+                    <span className="text-muted-foreground">{formatScheduled(item.scheduledAt)}</span>
+                    {item.customer?.name ? (
+                      <span className="text-muted-foreground">{item.customer.name}</span>
+                    ) : null}
+                  </div>
+                </div>
+              )}
+            />
+            <DesktopTableShell>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Title</TableHead>
+                    <TableHead>Type</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead>Scheduled</TableHead>
+                    <TableHead>Customer</TableHead>
+                    <TableHead className="w-20">Join</TableHead>
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </div>
+                </TableHeader>
+                <TableBody>
+                  {items.map((item) => (
+                    <TableRow
+                      key={item.id}
+                      className="cursor-pointer"
+                      onClick={() => setSelectedId(item.id)}
+                    >
+                      <TableCell className="font-medium">{item.title}</TableCell>
+                      <TableCell>
+                        <Badge variant="secondary">{MEETING_TYPE_LABELS[item.type]}</Badge>
+                      </TableCell>
+                      <TableCell>
+                        <Badge className={cn("capitalize", statusStyles[item.status])}>
+                          {MEETING_STATUS_LABELS[item.status]}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="text-muted-foreground">
+                        {formatScheduled(item.scheduledAt)}
+                      </TableCell>
+                      <TableCell>{item.customer?.name ?? "—"}</TableCell>
+                      <TableCell>
+                        {item.meetingUrl ? (
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              window.open(item.meetingUrl!, "_blank");
+                            }}
+                          >
+                            <Video className="h-4 w-4" />
+                          </Button>
+                        ) : (
+                          "—"
+                        )}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </DesktopTableShell>
+          </>
         ) : !creating ? (
           <div className="flex flex-col items-center justify-center border border-dashed border-border py-16 text-center">
             <p className="text-sm font-medium">No meetings</p>

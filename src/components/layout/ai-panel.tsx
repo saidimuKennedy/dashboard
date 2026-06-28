@@ -12,7 +12,9 @@ import {
   MessageSquarePlus,
   Send,
   Sparkles,
+  X,
 } from "lucide-react";
+import { useDashboardLayout } from "@/components/layout/dashboard-layout-context";
 import { toast } from "sonner";
 import { AiConversationView } from "@/components/ai/ai-conversation-view";
 import { Button } from "@/components/ui/button";
@@ -71,7 +73,7 @@ function AiPanelInner() {
   const persona = getPersona(pathname);
   const contextKey = pathname;
 
-  const [open, setOpen] = useState(true);
+  const { isDesktop, aiPanelOpen, setAiPanelOpen, toggleAiPanel } = useDashboardLayout();
   const [input, setInput] = useState("");
   const [exportingResearch, setExportingResearch] = useState(false);
   const [exportingJournal, setExportingJournal] = useState(false);
@@ -226,32 +228,14 @@ function AiPanelInner() {
     toast.success("New chat started");
   }
 
-  return (
+  const panelContent = (
     <>
-      <button
-        type="button"
-        onClick={() => setOpen((value) => !value)}
-        className={cn(
-          "absolute top-1/2 z-20 flex h-8 w-5 -translate-y-1/2 items-center justify-center rounded-l-md border border-r-0 border-border bg-card text-muted-foreground transition-colors hover:text-foreground",
-          open ? "right-[360px]" : "right-0"
-        )}
-        aria-label={open ? "Collapse AI panel" : "Expand AI panel"}
-      >
-        {open ? <ChevronRight className="h-4 w-4" /> : <ChevronLeft className="h-4 w-4" />}
-      </button>
-
-      <aside
-        className={cn(
-          "flex shrink-0 flex-col border-l border-border bg-card transition-all duration-250 ease-out",
-          open ? "w-[360px]" : "w-0 overflow-hidden border-l-0"
-        )}
-      >
-        <div className="flex h-14 items-center justify-between gap-2 border-b border-border px-4">
-          <div className="flex items-center gap-2">
-            <Sparkles className="h-4 w-4 text-primary" />
-            <div>
-              <p className="text-sm font-semibold">AI Assistant</p>
-              <p className="text-[10px] text-muted-foreground">
+      <div className="flex h-14 items-center justify-between gap-2 border-b border-border px-4">
+        <div className="flex min-w-0 items-center gap-2">
+          <Sparkles className="h-4 w-4 shrink-0 text-primary" />
+          <div className="min-w-0">
+            <p className="text-sm font-semibold">AI Assistant</p>
+            <p className="truncate text-[10px] text-muted-foreground">
                 {isJournalPage
                   ? "Journal coach"
                   : isDecisionsPage
@@ -262,7 +246,18 @@ function AiPanelInner() {
               </p>
             </div>
           </div>
-          <div className="flex items-center gap-1">
+          <div className="flex shrink-0 items-center gap-1">
+            {!isDesktop ? (
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8"
+                onClick={() => setAiPanelOpen(false)}
+                aria-label="Close AI assistant"
+              >
+                <X className="h-4 w-4" />
+              </Button>
+            ) : null}
             <Button
               variant="ghost"
               size="icon"
@@ -390,6 +385,48 @@ function AiPanelInner() {
             </Button>
           </div>
         </div>
+    </>
+  );
+
+  if (!isDesktop) {
+    if (!aiPanelOpen) return null;
+
+    return (
+      <>
+        <button
+          type="button"
+          className="fixed inset-0 z-40 bg-background/80 backdrop-blur-sm lg:hidden"
+          onClick={() => setAiPanelOpen(false)}
+          aria-label="Close AI assistant"
+        />
+        <aside className="fixed inset-y-0 right-0 z-50 flex w-full max-w-md flex-col border-l border-border bg-card shadow-2xl lg:hidden">
+          {panelContent}
+        </aside>
+      </>
+    );
+  }
+
+  return (
+    <>
+      <button
+        type="button"
+        onClick={toggleAiPanel}
+        className={cn(
+          "absolute top-1/2 z-20 hidden h-8 w-5 -translate-y-1/2 items-center justify-center rounded-l-md border border-r-0 border-border bg-card text-muted-foreground transition-colors hover:text-foreground lg:flex",
+          aiPanelOpen ? "right-[360px]" : "right-0"
+        )}
+        aria-label={aiPanelOpen ? "Collapse AI panel" : "Expand AI panel"}
+      >
+        {aiPanelOpen ? <ChevronRight className="h-4 w-4" /> : <ChevronLeft className="h-4 w-4" />}
+      </button>
+
+      <aside
+        className={cn(
+          "hidden shrink-0 flex-col border-l border-border bg-card transition-all duration-250 ease-out lg:flex",
+          aiPanelOpen ? "w-[360px]" : "w-0 overflow-hidden border-l-0"
+        )}
+      >
+        {panelContent}
       </aside>
     </>
   );

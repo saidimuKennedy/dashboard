@@ -2,6 +2,7 @@
 
 import { type LucideIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { PageHeader } from "@/components/ui/responsive-data-list";
 import {
   Table,
   TableBody,
@@ -42,13 +43,11 @@ export function ModulePage({
 }: ModulePageProps) {
   return (
     <div className="space-y-6">
-      <div className="flex items-start justify-between gap-4">
-        <div>
-          <h1 className="text-xl font-semibold tracking-tight">{title}</h1>
-          <p className="mt-1 text-sm text-muted-foreground">{description}</p>
-        </div>
-        {showCta && !creating ? <Button onClick={onCtaClick}>{ctaLabel}</Button> : null}
-      </div>
+      <PageHeader
+        title={title}
+        description={description}
+        action={showCta && !creating ? <Button onClick={onCtaClick}>{ctaLabel}</Button> : undefined}
+      />
 
       {loading ? (
         <div className="rounded-xl border border-border">

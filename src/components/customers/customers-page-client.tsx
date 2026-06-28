@@ -33,6 +33,7 @@ import {
   type PortfolioCustomerInsight,
 } from "@/types/customer";
 import { cn } from "@/lib/utils";
+import { DesktopTableShell, MobileRecordList, PageHeader } from "@/components/ui/responsive-data-list";
 
 const statusStyles: Record<string, string> = {
   PROSPECT: "bg-primary/15 text-primary border-primary/30",
@@ -257,17 +258,11 @@ export function CustomersPageClient() {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Customers</h1>
-          <p className="text-sm text-muted-foreground">
-            Customer relationships, contracts, timelines, and AI insights.
-          </p>
-        </div>
-        {!creating ? (
-          <Button onClick={openCreateForm}>Add Customer</Button>
-        ) : null}
-      </div>
+      <PageHeader
+        title="Customers"
+        description="Customer relationships, contracts, timelines, and AI insights."
+        action={!creating ? <Button onClick={openCreateForm}>Add Customer</Button> : undefined}
+      />
 
       {portfolioBanner}
       {createForm}
@@ -288,66 +283,102 @@ export function CustomersPageClient() {
           </CardContent>
         </Card>
       ) : (
-        <Card>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Name</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead>Contract</TableHead>
-                <TableHead>Company</TableHead>
-                <TableHead>Updated</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {items.map((item) => {
-                const contract = item.contracts?.[0];
-                const closure = contract ? getContractClosureWarning(contract.endDate) : null;
-                return (
-                  <TableRow
-                    key={item.id}
-                    className="cursor-pointer hover:bg-muted/50"
-                    onClick={() => setSelectedId(item.id)}
-                  >
-                    <TableCell className="font-medium">{item.name}</TableCell>
-                    <TableCell>
-                      <Badge className={cn("capitalize", statusStyles[item.status ?? "ACTIVE"])}>
-                        {(item.status ?? "ACTIVE").toLowerCase()}
-                      </Badge>
-                    </TableCell>
-                    <TableCell>
-                      {contract ? (
-                        <div className="flex items-center gap-1.5">
-                          {closure?.warning ? (
-                            <AlertTriangle
-                              className={cn(
-                                "h-3.5 w-3.5",
-                                closure.warning === "critical" && "text-error",
-                                closure.warning === "warning" && "text-warning",
-                                closure.warning === "notice" && "text-primary"
-                              )}
-                            />
-                          ) : null}
-                          <span className="text-xs text-muted-foreground">
-                            {closure?.daysUntilEnd != null && closure.daysUntilEnd >= 0
-                              ? `${closure.daysUntilEnd}d left`
-                              : "Expired"}
-                          </span>
-                        </div>
-                      ) : (
-                        <span className="text-xs text-muted-foreground">No contract</span>
-                      )}
-                    </TableCell>
-                    <TableCell className="text-muted-foreground">{item.company ?? "—"}</TableCell>
-                    <TableCell className="text-muted-foreground">
-                      {item.updatedAt ? new Date(item.updatedAt).toLocaleDateString() : "—"}
-                    </TableCell>
-                  </TableRow>
-                );
-              })}
-            </TableBody>
-          </Table>
-        </Card>
+        <>
+          <MobileRecordList
+            items={items}
+            keyExtractor={(item) => item.id}
+            onItemClick={(item) => setSelectedId(item.id)}
+            renderItem={(item) => {
+              const contract = item.contracts?.[0];
+              const closure = contract ? getContractClosureWarning(contract.endDate) : null;
+              return (
+                <div className="space-y-2">
+                  <div className="flex items-start justify-between gap-2">
+                    <p className="font-medium">{item.name}</p>
+                    <Badge className={cn("capitalize", statusStyles[item.status ?? "ACTIVE"])}>
+                      {(item.status ?? "ACTIVE").toLowerCase()}
+                    </Badge>
+                  </div>
+                  <div className="flex flex-wrap gap-2 text-sm text-muted-foreground">
+                    {item.company ? <span>{item.company}</span> : null}
+                    {contract ? (
+                      <span>
+                        {closure?.daysUntilEnd != null && closure.daysUntilEnd >= 0
+                          ? `${closure.daysUntilEnd}d left on contract`
+                          : "Contract expired"}
+                      </span>
+                    ) : (
+                      <span>No contract</span>
+                    )}
+                    {item.updatedAt ? (
+                      <span>{new Date(item.updatedAt).toLocaleDateString()}</span>
+                    ) : null}
+                  </div>
+                </div>
+              );
+            }}
+          />
+          <DesktopTableShell>
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Name</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead>Contract</TableHead>
+                  <TableHead>Company</TableHead>
+                  <TableHead>Updated</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {items.map((item) => {
+                  const contract = item.contracts?.[0];
+                  const closure = contract ? getContractClosureWarning(contract.endDate) : null;
+                  return (
+                    <TableRow
+                      key={item.id}
+                      className="cursor-pointer hover:bg-muted/50"
+                      onClick={() => setSelectedId(item.id)}
+                    >
+                      <TableCell className="font-medium">{item.name}</TableCell>
+                      <TableCell>
+                        <Badge className={cn("capitalize", statusStyles[item.status ?? "ACTIVE"])}>
+                          {(item.status ?? "ACTIVE").toLowerCase()}
+                        </Badge>
+                      </TableCell>
+                      <TableCell>
+                        {contract ? (
+                          <div className="flex items-center gap-1.5">
+                            {closure?.warning ? (
+                              <AlertTriangle
+                                className={cn(
+                                  "h-3.5 w-3.5",
+                                  closure.warning === "critical" && "text-error",
+                                  closure.warning === "warning" && "text-warning",
+                                  closure.warning === "notice" && "text-primary"
+                                )}
+                              />
+                            ) : null}
+                            <span className="text-xs text-muted-foreground">
+                              {closure?.daysUntilEnd != null && closure.daysUntilEnd >= 0
+                                ? `${closure.daysUntilEnd}d left`
+                                : "Expired"}
+                            </span>
+                          </div>
+                        ) : (
+                          <span className="text-xs text-muted-foreground">No contract</span>
+                        )}
+                      </TableCell>
+                      <TableCell className="text-muted-foreground">{item.company ?? "—"}</TableCell>
+                      <TableCell className="text-muted-foreground">
+                        {item.updatedAt ? new Date(item.updatedAt).toLocaleDateString() : "—"}
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
+              </TableBody>
+            </Table>
+          </DesktopTableShell>
+        </>
       )}
 
       <CustomerDetailModal
