@@ -114,12 +114,14 @@ export function ModulePageClient({
     window.addEventListener("compliance:updated", handleModuleUpdated);
     window.addEventListener("risk:updated", handleModuleUpdated);
     window.addEventListener("product:updated", handleModuleUpdated);
+    window.addEventListener("knowledge:updated", handleModuleUpdated);
     return () => {
       window.removeEventListener("research:updated", handleModuleUpdated);
       window.removeEventListener("journal:updated", handleModuleUpdated);
       window.removeEventListener("compliance:updated", handleModuleUpdated);
       window.removeEventListener("risk:updated", handleModuleUpdated);
       window.removeEventListener("product:updated", handleModuleUpdated);
+      window.removeEventListener("knowledge:updated", handleModuleUpdated);
     };
   }, [fetchItems]);
 

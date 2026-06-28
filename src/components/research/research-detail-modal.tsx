@@ -28,6 +28,7 @@ import {
   detailModalActionsClassName,
   detailModalHeaderClassName,
 } from "@/components/ui/detail-modal-shell";
+import { useMediaQuery } from "@/hooks/use-media-query";
 import { cn } from "@/lib/utils";
 import {
   formatChatTranscript,
@@ -73,6 +74,7 @@ export function ResearchDetailModal({ researchId, onClose }: ResearchDetailModal
   });
   const bodyRef = useRef<HTMLDivElement>(null);
   const draggingRef = useRef(false);
+  const isDesktop = useMediaQuery("(min-width: 1024px)");
 
   const fetchTopic = useCallback(() => {
     if (!researchId) return;
@@ -271,7 +273,7 @@ export function ResearchDetailModal({ researchId, onClose }: ResearchDetailModal
                   <h2 className="truncate text-lg font-semibold">{topic?.title ?? "Research"}</h2>
                   {topic?.stage ? <Badge variant="secondary">{topic.stage}</Badge> : null}
                 </div>
-                {analysis && !kpiCollapsed ? (
+                {analysis && !kpiCollapsed && isDesktop ? (
                   <p className="mt-1 line-clamp-2 text-sm text-muted-foreground">{analysis.summary}</p>
                 ) : null}
               </>
@@ -338,15 +340,17 @@ export function ResearchDetailModal({ researchId, onClose }: ResearchDetailModal
               <>
                 <div
                   className={cn(
-                    "shrink-0 overflow-hidden border-b border-border transition-[height] duration-200 ease-out",
-                    kpiCollapsed ? "h-auto" : ""
+                    "shrink-0 border-b border-border",
+                    isDesktop && !kpiCollapsed
+                      ? "overflow-hidden transition-[height] duration-200 ease-out"
+                      : "h-auto"
                   )}
-                  style={kpiCollapsed ? undefined : { height: kpiHeight }}
+                  style={isDesktop && !kpiCollapsed ? { height: kpiHeight } : undefined}
                 >
                   {kpiCollapsed ? (
                     <CollapsedKpiBar analysis={analysis} onExpand={toggleKpiCollapsed} />
                   ) : (
-                    <div className="grid h-full gap-3 overflow-y-auto px-6 py-3 sm:grid-cols-3">
+                    <div className="grid gap-3 px-4 py-3 lg:h-full lg:grid-cols-3 lg:overflow-y-auto lg:px-6">
                       <KpiCard
                         title="Importance"
                         value={`${analysis.importanceScore}/100`}
@@ -373,39 +377,50 @@ export function ResearchDetailModal({ researchId, onClose }: ResearchDetailModal
                   )}
                 </div>
 
-                <div
-                  role="separator"
-                  aria-orientation="horizontal"
-                  aria-label="Resize KPI panel"
-                  className="group flex shrink-0 cursor-row-resize items-center justify-center border-b border-border bg-muted/20 py-1 transition-colors hover:bg-muted/50"
-                  onPointerDown={handleResizeStart}
-                  onPointerMove={handleResizeMove}
-                  onPointerUp={handleResizeEnd}
-                  onPointerCancel={handleResizeEnd}
-                  onDoubleClick={toggleKpiCollapsed}
-                >
-                  <div className="flex items-center gap-2 rounded-md px-2 py-0.5 text-muted-foreground group-hover:text-foreground">
-                    <GripHorizontal className="h-4 w-4" />
-                    <span className="text-[10px] font-medium uppercase tracking-wide">
-                      {kpiCollapsed ? "Drag down to expand KPIs" : "Drag to resize KPIs"}
-                    </span>
-                    <button
-                      type="button"
-                      onClick={(event) => {
-                        event.stopPropagation();
-                        toggleKpiCollapsed();
-                      }}
-                      className="rounded p-0.5 hover:bg-muted"
-                      aria-label={kpiCollapsed ? "Expand KPIs" : "Collapse KPIs"}
-                    >
-                      {kpiCollapsed ? (
-                        <ChevronDown className="h-3.5 w-3.5" />
-                      ) : (
-                        <ChevronUp className="h-3.5 w-3.5" />
-                      )}
-                    </button>
+                {isDesktop ? (
+                  <div
+                    role="separator"
+                    aria-orientation="horizontal"
+                    aria-label="Resize KPI panel"
+                    className="group flex shrink-0 cursor-row-resize items-center justify-center border-b border-border bg-muted/20 py-1 transition-colors hover:bg-muted/50"
+                    onPointerDown={handleResizeStart}
+                    onPointerMove={handleResizeMove}
+                    onPointerUp={handleResizeEnd}
+                    onPointerCancel={handleResizeEnd}
+                    onDoubleClick={toggleKpiCollapsed}
+                  >
+                    <div className="flex items-center gap-2 rounded-md px-2 py-0.5 text-muted-foreground group-hover:text-foreground">
+                      <GripHorizontal className="h-4 w-4" />
+                      <span className="text-[10px] font-medium uppercase tracking-wide">
+                        {kpiCollapsed ? "Drag down to expand KPIs" : "Drag to resize KPIs"}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          toggleKpiCollapsed();
+                        }}
+                        className="rounded p-0.5 hover:bg-muted"
+                        aria-label={kpiCollapsed ? "Expand KPIs" : "Collapse KPIs"}
+                      >
+                        {kpiCollapsed ? (
+                          <ChevronDown className="h-3.5 w-3.5" />
+                        ) : (
+                          <ChevronUp className="h-3.5 w-3.5" />
+                        )}
+                      </button>
+                    </div>
                   </div>
-                </div>
+                ) : !kpiCollapsed ? (
+                  <button
+                    type="button"
+                    onClick={toggleKpiCollapsed}
+                    className="flex w-full shrink-0 items-center justify-center gap-2 border-b border-border bg-muted/20 px-4 py-2 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted/40 hover:text-foreground lg:hidden"
+                  >
+                    Hide KPIs
+                    <ChevronUp className="h-3.5 w-3.5" />
+                  </button>
+                ) : null}
               </>
             ) : null}
 
@@ -587,7 +602,7 @@ function CollapsedKpiBar({
       <Badge className={cn("shrink-0 capitalize", verdictStyles[analysis.importanceVerdict])}>
         {analysis.importanceVerdict}
       </Badge>
-      <span className="hidden shrink-0 items-center gap-1 text-xs text-muted-foreground sm:flex">
+      <span className="flex shrink-0 items-center gap-1 text-xs text-muted-foreground">
         <Clock className="h-3 w-3" />
         {analysis.timeToExecute}
       </span>
@@ -622,7 +637,7 @@ function KpiCard({
       </CardHeader>
       <CardContent className="pb-3">
         {compact ? (
-          <p className="line-clamp-4 text-sm leading-relaxed text-muted-foreground">{value}</p>
+          <p className="text-sm leading-relaxed text-muted-foreground lg:line-clamp-4">{value}</p>
         ) : (
           <>
             <p className="text-xl font-semibold tabular-nums">{value}</p>

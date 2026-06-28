@@ -1,17 +1,18 @@
-import { ModulePageClient } from "@/components/dashboard/module-page-client";
-import { knowledgeCreateFields } from "@/config/module-create-fields";
+import { Suspense } from "react";
+import { KnowledgePageClient } from "@/components/knowledge/knowledge-page-client";
+import { Skeleton } from "@/components/ui/skeleton";
 
 export default function KnowledgePage() {
   return (
-    <ModulePageClient
-      title="Knowledge"
-      description="Central repository of business knowledge, documentation, and insights."
-      ctaLabel="Add Article"
-      endpoint="/api/v1/knowledge"
-      columns={["Title", "Status", "Updated", "Author"]}
-      emptyTitle="No knowledge articles"
-      emptyDescription="Document decisions, processes, and institutional knowledge for your team."
-      createFields={knowledgeCreateFields}
-    />
+    <Suspense
+      fallback={
+        <div className="space-y-4">
+          <Skeleton className="h-8 w-48" />
+          <Skeleton className="h-40 w-full" />
+        </div>
+      }
+    >
+      <KnowledgePageClient />
+    </Suspense>
   );
 }
