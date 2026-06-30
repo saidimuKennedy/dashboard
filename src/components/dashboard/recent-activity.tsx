@@ -1,5 +1,6 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
+import { stripMarkdown } from "@/lib/ai/strip-markdown";
 import { cn } from "@/lib/utils";
 
 function formatRelative(date: string | Date) {
@@ -70,7 +71,7 @@ export function RecentActivity({ title, items, loading, emptyMessage, onItemClic
                 <p className="text-sm font-medium leading-snug">{item.title}</p>
                 {item.subtitle && (
                   <p className="mt-0.5 line-clamp-2 text-xs text-muted-foreground">
-                    {item.subtitle}
+                    {stripMarkdown(item.subtitle)}
                   </p>
                 )}
                 {item.date && (

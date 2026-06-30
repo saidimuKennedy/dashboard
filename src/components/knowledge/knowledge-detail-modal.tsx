@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { AiMarkdown } from "@/components/ai/ai-message-content";
 import { BookOpen, Sparkles, Trash2, X } from "lucide-react";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
@@ -252,7 +253,7 @@ export function KnowledgeDetailModal({
                   </div>
                 </CardHeader>
                 <CardContent>
-                  <p className="whitespace-pre-wrap text-sm text-muted-foreground">{aiSummary}</p>
+                  <AiMarkdown content={aiSummary} />
                 </CardContent>
               </Card>
             ) : null}

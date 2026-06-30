@@ -12,6 +12,7 @@ import {
   X,
 } from "lucide-react";
 import { toast } from "sonner";
+import { AiMarkdown } from "@/components/ai/ai-message-content";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -561,15 +562,15 @@ export function MeetingDetailModal({ meetingId, onClose }: MeetingDetailModalPro
                       <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
                         Summary
                       </p>
-                      <div className="border border-border bg-muted/20 p-3 text-sm whitespace-pre-wrap">
-                        {meeting.aiSummary}
+                      <div className="border border-border bg-muted/20 p-3">
+                        <AiMarkdown content={meeting.aiSummary} />
                       </div>
                     </div>
                   ) : null}
 
                   {evaluation ? (
                     <div className="space-y-3 border border-border bg-muted/20 p-3 text-sm">
-                      <p className="font-medium">{evaluation.summary}</p>
+                      <AiMarkdown content={evaluation.summary} className="font-medium" />
                       {evaluation.achievements.length > 0 ? (
                         <div>
                           <p className="text-xs font-medium text-muted-foreground">Achievements</p>

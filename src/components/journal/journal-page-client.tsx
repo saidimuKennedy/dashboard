@@ -7,6 +7,7 @@ import { JournalDetailModal } from "@/components/journal/journal-detail-modal";
 import { journalCreateFields } from "@/config/module-create-fields";
 import { Badge } from "@/components/ui/badge";
 import { TableCell, TableRow } from "@/components/ui/table";
+import { stripMarkdown } from "@/lib/ai/strip-markdown";
 import { cn } from "@/lib/utils";
 
 function renderJournalRow(
@@ -19,7 +20,7 @@ function renderJournalRow(
     : "—";
   const mood = item.mood ? String(item.mood) : "—";
   const author = (item.author as { firstName?: string })?.firstName ?? "—";
-  const preview = String(item.aiSummary ?? item.content ?? "—");
+  const preview = stripMarkdown(String(item.aiSummary ?? item.content ?? "—"));
   const excerpt = preview.length > 100 ? `${preview.slice(0, 100)}…` : preview;
 
   return (

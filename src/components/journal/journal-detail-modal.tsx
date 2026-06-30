@@ -14,6 +14,7 @@ import {
   detailModalActionsClassName,
   detailModalHeaderClassName,
 } from "@/components/ui/detail-modal-shell";
+import { AiMarkdown } from "@/components/ai/ai-message-content";
 import type { JournalDetail } from "@/types/journal";
 
 interface JournalDetailModalProps {
@@ -213,9 +214,7 @@ export function JournalDetailModal({ entryId, onClose }: JournalDetailModalProps
                     <CardTitle className="text-sm font-medium">AI Summary</CardTitle>
                   </CardHeader>
                   <CardContent>
-                    <p className="text-sm text-muted-foreground whitespace-pre-wrap">
-                      {entry.aiSummary}
-                    </p>
+                    <AiMarkdown content={entry.aiSummary} />
                   </CardContent>
                 </Card>
               ) : null}

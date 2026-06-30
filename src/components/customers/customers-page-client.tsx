@@ -4,6 +4,7 @@ import { FormEvent, useCallback, useEffect, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { AlertTriangle, Sparkles, Users } from "lucide-react";
 import { toast } from "sonner";
+import { stripMarkdown } from "@/lib/ai/strip-markdown";
 import { CustomerDetailModal } from "@/components/customers/customer-detail-modal";
 import { ModulePage } from "@/components/dashboard/module-page";
 import {
@@ -237,7 +238,9 @@ export function CustomersPageClient() {
                     <Badge variant="secondary">{insight.alias}</Badge>
                     <span className="text-sm font-semibold">{insight.dealScore}/100</span>
                   </div>
-                  <p className="mt-1 line-clamp-2 text-xs text-muted-foreground">{insight.summary}</p>
+                  <p className="mt-1 line-clamp-2 text-xs text-muted-foreground">
+                    {stripMarkdown(insight.summary)}
+                  </p>
                 </button>
               ))}
             </div>

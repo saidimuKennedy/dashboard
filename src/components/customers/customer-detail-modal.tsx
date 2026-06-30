@@ -15,7 +15,7 @@ import {
   X,
 } from "lucide-react";
 import { toast } from "sonner";
-import { AiMessageContent } from "@/components/ai/ai-message-content";
+import { AiMarkdown, AiMessageContent } from "@/components/ai/ai-message-content";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -1205,7 +1205,7 @@ function InsightsTab({
                       <span className="font-medium">{rec.productName}</span>
                       <Badge variant="secondary">{rec.fitScore}% fit</Badge>
                     </div>
-                    <p className="mt-1 text-muted-foreground">{rec.rationale}</p>
+                    <AiMarkdown content={rec.rationale} className="mt-1" />
                   </div>
                 ))}
               </div>
@@ -1329,11 +1329,13 @@ function Section({ title, content, items }: { title: string; content?: string; i
   return (
     <div>
       <h4 className="mb-2 text-sm font-medium">{title}</h4>
-      {content ? <p className="text-sm text-muted-foreground">{content}</p> : null}
+      {content ? <AiMarkdown content={content} /> : null}
       {items?.length ? (
-        <ul className="list-inside list-disc space-y-1 text-sm text-muted-foreground">
+        <ul className="space-y-2">
           {items.map((item, i) => (
-            <li key={i}>{item}</li>
+            <li key={i}>
+              <AiMarkdown content={item} />
+            </li>
           ))}
         </ul>
       ) : null}

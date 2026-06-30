@@ -16,7 +16,7 @@ import {
   X,
 } from "lucide-react";
 import { toast } from "sonner";
-import { AiMessageContent } from "@/components/ai/ai-message-content";
+import { AiMarkdown, AiMessageContent } from "@/components/ai/ai-message-content";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -29,6 +29,7 @@ import {
   detailModalHeaderClassName,
 } from "@/components/ui/detail-modal-shell";
 import { useMediaQuery } from "@/hooks/use-media-query";
+import { stripMarkdown } from "@/lib/ai/strip-markdown";
 import { cn } from "@/lib/utils";
 import {
   formatChatTranscript,
@@ -274,7 +275,9 @@ export function ResearchDetailModal({ researchId, onClose }: ResearchDetailModal
                   {topic?.stage ? <Badge variant="secondary">{topic.stage}</Badge> : null}
                 </div>
                 {analysis && !kpiCollapsed && isDesktop ? (
-                  <p className="mt-1 line-clamp-2 text-sm text-muted-foreground">{analysis.summary}</p>
+                  <p className="mt-1 line-clamp-2 text-sm text-muted-foreground">
+                    {stripMarkdown(analysis.summary)}
+                  </p>
                 ) : null}
               </>
             )}
@@ -568,9 +571,7 @@ export function ResearchDetailModal({ researchId, onClose }: ResearchDetailModal
                     ))}
                   </div>
                 ) : topic?.notes ? (
-                  <div className="prose-ai whitespace-pre-wrap text-sm text-muted-foreground">
-                    {topic.notes}
-                  </div>
+                  <AiMarkdown content={topic.notes} />
                 ) : (
                   <p className="text-sm text-muted-foreground">No chat transcript saved for this item.</p>
                 )
@@ -607,7 +608,7 @@ function CollapsedKpiBar({
         {analysis.timeToExecute}
       </span>
       <span className="min-w-0 truncate text-xs text-muted-foreground">
-        {analysis.importanceRationale}
+        {stripMarkdown(analysis.importanceRationale)}
       </span>
       <ChevronDown className="ml-auto h-4 w-4 shrink-0 text-muted-foreground" />
     </button>
@@ -637,7 +638,9 @@ function KpiCard({
       </CardHeader>
       <CardContent className="pb-3">
         {compact ? (
-          <p className="text-sm leading-relaxed text-muted-foreground lg:line-clamp-4">{value}</p>
+          <p className="text-sm leading-relaxed text-muted-foreground lg:line-clamp-4">
+            {stripMarkdown(value)}
+          </p>
         ) : (
           <>
             <p className="text-xl font-semibold tabular-nums">{value}</p>
@@ -669,15 +672,15 @@ function Section({
         <h3 className="text-sm font-semibold">{title}</h3>
       </div>
       {paragraph ? (
-        <p className="text-sm leading-relaxed text-muted-foreground">{items[0]}</p>
+        <AiMarkdown content={items[0]} />
       ) : (
         <ul className="space-y-2">
           {items.map((item, index) => (
             <li
               key={index}
-              className="rounded-lg border border-border bg-muted/30 px-3 py-2 text-sm text-muted-foreground"
+              className="rounded-lg border border-border bg-muted/30 px-3 py-2"
             >
-              {item}
+              <AiMarkdown content={item} />
             </li>
           ))}
         </ul>
