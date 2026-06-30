@@ -24,7 +24,8 @@ export const POST = withAuth(async (request, { user, params }) => {
     maskedContext,
     parsed.data.prompt,
     parsed.data.conversationId,
-    params!.id
+    params!.id,
+    user.role
   );
 
   return success({ ...result, alias: aliasRecord.alias });

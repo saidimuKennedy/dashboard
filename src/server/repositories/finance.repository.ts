@@ -1,5 +1,6 @@
 import { db } from "@/lib/db";
 import { customerRepository } from "@/server/repositories/dashboard.repository";
+import { scheduleRagIndex } from "@/server/ai/rag/indexer.service";
 
 export const financeRepository = {
   async listFormOptions() {
@@ -53,7 +54,7 @@ export const financeRepository = {
     },
     userId: string
   ) {
-    return db.revenueEntry.create({
+    const entry = await db.revenueEntry.create({
       data: {
         amount: data.amount,
         currency: data.currency ?? "KES",
@@ -70,6 +71,8 @@ export const financeRepository = {
         ...(data.contractId && { contract: { connect: { id: data.contractId } } }),
       },
     });
+    scheduleRagIndex("revenue_entry", entry.id);
+    return entry;
   },
 
   async createExpense(data: {
@@ -79,7 +82,7 @@ export const financeRepository = {
     description?: string;
     recordedAt?: Date;
   }) {
-    return db.expense.create({
+    const expense = await db.expense.create({
       data: {
         amount: data.amount,
         currency: data.currency ?? "KES",
@@ -88,6 +91,8 @@ export const financeRepository = {
         recordedAt: data.recordedAt ?? new Date(),
       },
     });
+    scheduleRagIndex("expense", expense.id);
+    return expense;
   },
 
   async createCashSnapshot(
@@ -116,7 +121,7 @@ export const financeRepository = {
     },
     userId: string
   ) {
-    return db.salesDeal.create({
+    const deal = await db.salesDeal.create({
       data: {
         customer: { connect: { id: data.customerId } },
         ...(data.productId && { product: { connect: { id: data.productId } } }),
@@ -127,6 +132,8 @@ export const financeRepository = {
         createdBy: userId,
       },
     });
+    scheduleRagIndex("sales_deal", deal.id);
+    return deal;
   },
 
   async createContract(

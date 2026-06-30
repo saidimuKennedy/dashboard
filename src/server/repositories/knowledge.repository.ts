@@ -1,5 +1,6 @@
 import { db } from "@/lib/db";
 import { slugify } from "@/lib/utils";
+import { scheduleRagIndex, scheduleRagRemove } from "@/server/ai/rag/indexer.service";
 import { ArticleStatus, Prisma } from "@prisma/client";
 
 export const knowledgeRepository = {
@@ -57,7 +58,7 @@ export const knowledgeRepository = {
     tagIds?: string[];
   }) {
     const slug = `${slugify(data.title)}-${Date.now()}`;
-    return db.knowledgeArticle.create({
+    const article = await db.knowledgeArticle.create({
       data: {
         title: data.title,
         slug,
@@ -74,6 +75,8 @@ export const knowledgeRepository = {
       },
       include: { category: true, tags: { include: { tag: true } } },
     });
+    scheduleRagIndex("knowledge", article.id);
+    return article;
   },
 
   async update(
@@ -98,14 +101,17 @@ export const knowledgeRepository = {
         data: { articleId: id, content: data.content, version: existing.version + 1, createdBy: userId },
       });
     }
+    scheduleRagIndex("knowledge", id);
     return article;
   },
 
   async softDelete(id: string, userId: string) {
-    return db.knowledgeArticle.update({
+    const article = await db.knowledgeArticle.update({
       where: { id },
       data: { deletedAt: new Date(), updatedBy: userId },
     });
+    scheduleRagRemove("knowledge", id);
+    return article;
   },
 
   async search(query: string, limit = 20) {

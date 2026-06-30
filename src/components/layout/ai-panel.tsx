@@ -1,7 +1,7 @@
 "use client";
 
 import { Suspense, useEffect, useState } from "react";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import {
   BookOpen,
   ChevronLeft,
@@ -23,36 +23,7 @@ import { useAiChat } from "@/hooks/use-ai-chat";
 import { useMessageHistory } from "@/hooks/use-message-history";
 import { cn } from "@/lib/utils";
 import { formatChatTranscript, type ResearchChatMessage } from "@/types/research";
-
-const DEFAULT_WELCOME =
-  "Ask me about your business — revenue, risks, compliance, or recent meetings.";
-
-const MEETINGS_WELCOME =
-  "Ask about meeting outcomes, upcoming schedules, follow-ups, or whether a meeting achieved its goals.";
-
-const JOURNAL_WELCOME =
-  "Tell me about your day — wins, challenges, lessons, and how you're feeling. I can turn this into a journal entry.";
-
-const DECISIONS_WELCOME =
-  "Talk through a decision — context, alternatives, tradeoffs, and when to revisit. I can log it as a structured decision record.";
-
-function getWelcomeMessage(pathname: string) {
-  if (pathname.startsWith("/journal")) return JOURNAL_WELCOME;
-  if (pathname.startsWith("/decisions")) return DECISIONS_WELCOME;
-  if (pathname.startsWith("/meetings")) return MEETINGS_WELCOME;
-  if (pathname.startsWith("/revenue")) {
-    return "Ask about MRR, runway, forecast risks, or revenue trends. Customer names are masked.";
-  }
-  return DEFAULT_WELCOME;
-}
-
-function getPersona(pathname: string) {
-  if (pathname.startsWith("/journal")) return "journal_assistant";
-  if (pathname.startsWith("/decisions")) return "decision_assistant";
-  if (pathname.startsWith("/meetings")) return "meeting_assistant";
-  if (pathname.startsWith("/revenue")) return "revenue_advisor";
-  return "business_advisor";
-}
+import { buildContextKey, getPersonaForRoute, getWelcomeMessage } from "@/lib/ai/route-persona";
 
 function getExportableMessages(
   messages: Array<{ role: string; content: string }>,
@@ -66,12 +37,14 @@ function getExportableMessages(
 function AiPanelInner() {
   const router = useRouter();
   const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const openId = searchParams.get("open");
   const welcomeMessage = getWelcomeMessage(pathname);
   const isJournalPage = pathname.startsWith("/journal");
   const isDecisionsPage = pathname.startsWith("/decisions");
   const isRevenuePage = pathname.startsWith("/revenue");
-  const persona = getPersona(pathname);
-  const contextKey = pathname;
+  const persona = getPersonaForRoute(pathname);
+  const contextKey = buildContextKey(pathname, openId);
 
   const { isDesktop, aiPanelOpen, setAiPanelOpen, toggleAiPanel } = useDashboardLayout();
   const [input, setInput] = useState("");

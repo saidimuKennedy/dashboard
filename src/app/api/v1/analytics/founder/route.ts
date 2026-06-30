@@ -5,6 +5,6 @@ import { aiService } from "@/server/ai/ai.service";
 
 export const GET = withAuth(async (_request, { user }) => {
   const overview = await dashboardRepository.getOverview(user.id);
-  const brief = await aiService.founderBrief();
+  const brief = await aiService.founderBrief(user.role);
   return success({ overview, brief });
 });

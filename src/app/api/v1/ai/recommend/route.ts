@@ -8,6 +8,6 @@ import { aiService } from "@/server/ai/ai.service";
 export const POST = withAuth(async (request, { user }) => {
   const parsed = await parseBody(request, aiRequestSchema);
   if (!parsed.ok) return parsed.response;
-  const result = await aiService.chat(user.id, { ...parsed.data, persona: "business_advisor" });
+  const result = await aiService.chat(user.id, { ...parsed.data, persona: "business_advisor", userRole: user.role });
   return success({ recommendations: result.response, sources: result.sources });
 }, "ai.use");

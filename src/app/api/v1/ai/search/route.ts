@@ -5,9 +5,9 @@ import { parseBody } from "@/lib/api/helpers";
 import { aiRequestSchema } from "@/lib/validations";
 import { aiService } from "@/server/ai/ai.service";
 
-export const POST = withAuth(async (request) => {
+export const POST = withAuth(async (request, { user }) => {
   const parsed = await parseBody(request, aiRequestSchema);
   if (!parsed.ok) return parsed.response;
-  const sources = await aiService.searchSemantic(parsed.data.prompt);
-  return success({ sources });
+  const sources = await aiService.searchSemantic(parsed.data.prompt, user.role, parsed.data.contextKey);
+  return success({ sources, results: sources });
 }, "ai.use");

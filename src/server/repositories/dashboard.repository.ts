@@ -1,5 +1,6 @@
 import { db } from "@/lib/db";
 import { getDeepSeekApiKey } from "@/lib/ai/deepseek";
+import { scheduleRagIndex, scheduleRagRemove } from "@/server/ai/rag/indexer.service";
 import { Prisma, ResearchStage } from "@prisma/client";
 
 export const dashboardRepository = {
@@ -251,15 +252,21 @@ export const customerRepository = {
   },
 
   async create(data: Prisma.CustomerCreateInput) {
-    return db.customer.create({ data });
+    const customer = await db.customer.create({ data });
+    scheduleRagIndex("customer", customer.id);
+    return customer;
   },
 
   async update(id: string, data: Prisma.CustomerUpdateInput) {
-    return db.customer.update({ where: { id }, data });
+    const customer = await db.customer.update({ where: { id }, data });
+    scheduleRagIndex("customer", id);
+    return customer;
   },
 
   async softDelete(id: string) {
-    return db.customer.update({ where: { id }, data: { deletedAt: new Date() } });
+    const customer = await db.customer.update({ where: { id }, data: { deletedAt: new Date() } });
+    scheduleRagRemove("customer", id);
+    return customer;
   },
 
   async getTimeline(id: string) {
@@ -320,7 +327,7 @@ export const customerContractRepository = {
     data: Omit<Prisma.CustomerContractCreateInput, "customer">,
     userId?: string
   ) {
-    return db.customerContract.create({
+    const contract = await db.customerContract.create({
       data: {
         ...data,
         customer: { connect: { id: customerId } },
@@ -329,14 +336,18 @@ export const customerContractRepository = {
       },
       include: { retainers: true },
     });
+    scheduleRagIndex("customer_contract", contract.id);
+    return contract;
   },
 
   async update(id: string, data: Prisma.CustomerContractUpdateInput, userId?: string) {
-    return db.customerContract.update({
+    const contract = await db.customerContract.update({
       where: { id },
       data: { ...data, updatedBy: userId },
       include: { retainers: true },
     });
+    scheduleRagIndex("customer_contract", id);
+    return contract;
   },
 
   async getById(id: string) {
@@ -396,15 +407,21 @@ export const journalRepository = {
   },
 
   async create(data: { authorId: string; content: string; lessons?: string; challenges?: string; wins?: string; mood?: string }) {
-    return db.journalEntry.create({ data: { ...data, createdBy: data.authorId } });
+    const entry = await db.journalEntry.create({ data: { ...data, createdBy: data.authorId } });
+    scheduleRagIndex("journal", entry.id);
+    return entry;
   },
 
   async update(id: string, data: Partial<{ content: string; lessons: string; challenges: string; wins: string; mood: string; aiSummary: string }>, userId: string) {
-    return db.journalEntry.update({ where: { id }, data: { ...data, updatedBy: userId } });
+    const entry = await db.journalEntry.update({ where: { id }, data: { ...data, updatedBy: userId } });
+    scheduleRagIndex("journal", id);
+    return entry;
   },
 
   async softDelete(id: string, userId: string) {
-    return db.journalEntry.update({ where: { id }, data: { deletedAt: new Date(), updatedBy: userId } });
+    const entry = await db.journalEntry.update({ where: { id }, data: { deletedAt: new Date(), updatedBy: userId } });
+    scheduleRagRemove("journal", id);
+    return entry;
   },
 };
 
@@ -429,7 +446,9 @@ export const researchRepository = {
     sourceChat?: Prisma.InputJsonValue;
     aiAnalysis?: Prisma.InputJsonValue;
   }) {
-    return db.researchTopic.create({ data: { ...data, createdBy: data.authorId } });
+    const topic = await db.researchTopic.create({ data: { ...data, createdBy: data.authorId } });
+    scheduleRagIndex("research", topic.id);
+    return topic;
   },
 
   async getById(id: string) {
@@ -451,10 +470,14 @@ export const researchRepository = {
     }>,
     userId: string
   ) {
-    return db.researchTopic.update({ where: { id }, data: { ...data, updatedBy: userId } });
+    const topic = await db.researchTopic.update({ where: { id }, data: { ...data, updatedBy: userId } });
+    scheduleRagIndex("research", id);
+    return topic;
   },
 
   async softDelete(id: string, userId: string) {
-    return db.researchTopic.update({ where: { id }, data: { deletedAt: new Date(), updatedBy: userId } });
+    const topic = await db.researchTopic.update({ where: { id }, data: { deletedAt: new Date(), updatedBy: userId } });
+    scheduleRagRemove("research", id);
+    return topic;
   },
 };

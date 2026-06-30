@@ -1,6 +1,8 @@
 import { db } from "@/lib/db";
 import { getDeepSeekApiKey } from "@/lib/ai/deepseek";
-import { knowledgeRepository } from "@/server/repositories/knowledge.repository";
+import { buildChatContext, buildFounderBriefContext } from "@/server/ai/rag/context-builder";
+import { ragRetrieval } from "@/server/ai/rag/retrieval.service";
+import type { UserRole } from "@prisma/client";
 import { analyzeResearchFromChat } from "@/server/ai/research-analysis";
 import { analyzeJournalFromChat } from "@/server/ai/journal-analysis";
 import { evaluateMeetingFromReport } from "@/server/ai/meeting-analysis";
@@ -17,7 +19,6 @@ import {
 } from "@/server/ai/customer-analysis";
 import {
   assertNoPii,
-  buildMaskedCustomerContext,
   maskPii,
   type PiiProfile,
 } from "@/lib/ai/pii-mask";
@@ -31,11 +32,12 @@ export type AiRequest = {
   persona?: string;
   conversationId?: string;
   contextKey?: string;
+  userRole?: UserRole;
 };
 
 export type AiResponse = {
   response: string;
-  sources: { id: string; title: string; type: string }[];
+  sources: { id: string; title: string; type: string; excerpt?: string; score?: number; url?: string }[];
   confidence: number;
   tokens: number;
   conversationId?: string;
@@ -52,16 +54,6 @@ const PROMPTS: Record<string, string> = {
   decision_assistant: "You are a decision-log coach for a founder. Help clarify context, alternatives, tradeoffs, and reasoning before logging a decision. Ask probing questions about assumptions, risks, and when to revisit the choice.",
   customer_success_advisor: "You are a customer success advisor. Discuss customers ONLY by their assigned alias. Never ask for or reference real names, emails, phone numbers, or company names. Provide deal insights, product recommendations, and contract advice based on masked profile data.",
 };
-
-async function retrieveContext(query: string, limit = 5) {
-  const articles = await knowledgeRepository.search(query, limit);
-  return articles.map((a) => ({
-    id: a.id,
-    title: a.title,
-    type: "knowledge",
-    excerpt: a.summary ?? "",
-  }));
-}
 
 async function callDeepSeek(systemPrompt: string, userPrompt: string, temperature = 0.3): Promise<{ content: string; tokens: number }> {
   const apiKey = await getDeepSeekApiKey();
@@ -102,23 +94,15 @@ export const aiService = {
   async chat(userId: string, request: AiRequest): Promise<AiResponse> {
     const persona = request.persona ?? "business_advisor";
     const systemPrompt = PROMPTS[persona] ?? PROMPTS.business_advisor;
-    const sources = await retrieveContext(request.prompt);
-    const extraContext: string[] = [...(request.context ?? [])];
+    const userRole = request.userRole ?? "FOUNDER";
 
-    if (request.contextKey === "/revenue") {
-      const { getRevenueFactsForAgent } = await import("@/lib/finance/reports");
-      extraContext.push(await getRevenueFactsForAgent());
-    }
-
-    if (request.contextKey?.startsWith("/meetings")) {
-      const meetingContext = await buildMeetingChatContext(request.contextKey);
-      if (meetingContext) extraContext.push(meetingContext);
-    }
-
-    const contextBlock = [
-      ...extraContext,
-      ...sources.map((s) => `[${s.title}]: ${s.excerpt}`),
-    ].join("\n");
+    const { contextBlock, sources } = await buildChatContext({
+      prompt: request.prompt,
+      contextKey: request.contextKey,
+      extraContext: request.context ?? [],
+      userRole,
+      userId,
+    });
 
     const userPrompt = contextBlock
       ? `Context:\n${contextBlock}\n\nQuestion: ${request.prompt}`
@@ -166,7 +150,14 @@ export const aiService = {
 
     return {
       response: content,
-      sources,
+      sources: sources.map((s) => ({
+        id: s.id,
+        title: s.title,
+        type: s.type,
+        excerpt: s.excerpt,
+        score: s.score,
+        url: s.url,
+      })),
       confidence: sources.length > 0 ? 0.85 : 0.6,
       tokens,
       conversationId: conversation.id,
@@ -181,20 +172,26 @@ export const aiService = {
     return { response: summary, sources: [], confidence: 0.9, tokens };
   },
 
-  async founderBrief(): Promise<AiResponse> {
-    const [articles, meetings, risks, compliance] = await Promise.all([
-      db.knowledgeArticle.count({ where: { deletedAt: null } }),
-      db.meeting.count({ where: { deletedAt: null, createdAt: { gte: new Date(Date.now() - 86400000) } } }),
-      db.risk.count({ where: { deletedAt: null, level: { in: ["HIGH", "CRITICAL"] } } }),
-      db.complianceItem.count({ where: { deletedAt: null, status: { in: ["AT_RISK", "NON_COMPLIANT"] } } }),
-    ]);
-
-    const prompt = `Generate founder brief. Stats: ${articles} articles, ${meetings} meetings yesterday, ${risks} high risks, ${compliance} compliance issues.`;
-    return this.chat("system", { prompt, persona: "founder_brief" });
+  async founderBrief(userRole: UserRole = "FOUNDER"): Promise<AiResponse> {
+    const context = await buildFounderBriefContext(userRole);
+    const prompt = `Generate a concise daily executive brief for the founder using the context below.\n\n${context}`;
+    return this.chat("system", { prompt, persona: "founder_brief", userRole });
   },
 
-  async searchSemantic(query: string) {
-    return retrieveContext(query, 10);
+  async searchSemantic(query: string, userRole: UserRole = "FOUNDER", contextKey?: string) {
+    const sources = await ragRetrieval.hybridSearch(query, {
+      limit: 10,
+      userRole,
+      contextKey,
+    });
+    return sources.map((s) => ({
+      id: s.id,
+      title: s.title,
+      type: s.type,
+      excerpt: s.excerpt,
+      score: s.score,
+      url: s.url,
+    }));
   },
 
   async analyzeResearchChat(messages: ResearchChatMessage[]) {
@@ -263,7 +260,8 @@ export const aiService = {
     maskedContext: string,
     prompt: string,
     conversationId?: string,
-    customerId?: string
+    customerId?: string,
+    userRole: UserRole = "FOUNDER"
   ): Promise<AiResponse> {
     const maskedPrompt = maskPii(prompt, profile);
     assertNoPii(maskedPrompt, profile);
@@ -275,6 +273,7 @@ export const aiService = {
       persona: "customer_success_advisor",
       conversationId,
       contextKey: customerId ? `/customers/${customerId}` : "/customers",
+      userRole,
     });
   },
 
@@ -318,70 +317,3 @@ export const aiService = {
     };
   },
 };
-
-async function buildMeetingChatContext(contextKey: string): Promise<string | null> {
-  const parts = contextKey.split("/").filter(Boolean);
-  if (parts[0] !== "meetings") return null;
-
-  if (parts[1]) {
-    const meeting = await db.meeting.findFirst({
-      where: { id: parts[1], deletedAt: null },
-      include: {
-        customer: { select: { name: true } },
-        actionItems: { where: { deletedAt: null } },
-      },
-    });
-    if (!meeting) return null;
-
-    return [
-      `Meeting: ${meeting.title}`,
-      meeting.scheduledAt ? `Scheduled: ${meeting.scheduledAt.toISOString()}` : "",
-      meeting.type ? `Type: ${meeting.type}` : "",
-      meeting.status ? `Status: ${meeting.status}` : "",
-      meeting.outcome ? `Outcome: ${meeting.outcome}` : "",
-      meeting.customer ? `Customer: ${meeting.customer.name}` : "",
-      meeting.agenda ? `Agenda:\n${meeting.agenda}` : "",
-      meeting.outcomeReport ? `Outcome report:\n${meeting.outcomeReport}` : "",
-      meeting.minutes ? `Minutes:\n${meeting.minutes}` : "",
-      meeting.aiSummary ? `AI summary:\n${meeting.aiSummary}` : "",
-      meeting.aiEvaluation ? `AI evaluation:\n${meeting.aiEvaluation}` : "",
-      meeting.actionItems.length
-        ? `Action items:\n${meeting.actionItems.map((a) => `- ${a.title}${a.completed ? " (done)" : ""}`).join("\n")}`
-        : "",
-    ]
-      .filter(Boolean)
-      .join("\n");
-  }
-
-  const upcoming = await db.meeting.findMany({
-    where: { deletedAt: null, status: "SCHEDULED", scheduledAt: { gte: new Date() } },
-    take: 5,
-    orderBy: { scheduledAt: "asc" },
-    select: { title: true, scheduledAt: true, type: true, outcome: true },
-  });
-
-  const recent = await db.meeting.findMany({
-    where: { deletedAt: null, status: "COMPLETED" },
-    take: 5,
-    orderBy: { scheduledAt: "desc" },
-    select: { title: true, scheduledAt: true, outcome: true, aiSummary: true },
-  });
-
-  return [
-    "Upcoming meetings:",
-    upcoming.length
-      ? upcoming
-          .map((m) => `- ${m.title} (${m.scheduledAt?.toISOString() ?? "unscheduled"}, ${m.type})`)
-          .join("\n")
-      : "None scheduled.",
-    "Recent completed meetings:",
-    recent.length
-      ? recent
-          .map(
-            (m) =>
-              `- ${m.title} (${m.outcome})${m.aiSummary ? `: ${m.aiSummary.slice(0, 120)}` : ""}`
-          )
-          .join("\n")
-      : "None completed yet.",
-  ].join("\n\n");
-}

@@ -13,6 +13,7 @@ export const POST = withAuth(async (request, { user }) => {
   const result = await aiService.chat(user.id, {
     prompt: `${parsed.data.prompt}\n\nCurrent risks: ${JSON.stringify(items.map((r: { title: string; level: string }) => ({ title: r.title, level: r.level })))}`,
     persona: "compliance_advisor",
+    userRole: user.role,
   });
   return success(result);
 }, "ai.use");

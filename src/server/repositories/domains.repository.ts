@@ -1,6 +1,7 @@
 import { db } from "@/lib/db";
 import { clearDecisionReminders, syncDecisionReviewReminders } from "@/lib/decisions/reminders";
 import { assertStatusTransition } from "@/lib/decisions/status-transitions";
+import { scheduleRagIndex, scheduleRagRemove } from "@/server/ai/rag/indexer.service";
 import { DecisionStatus, Prisma, RiskCategory, RiskLevel } from "@prisma/client";
 
 export { InvalidStatusTransitionError } from "@/lib/decisions/status-transitions";
@@ -117,6 +118,7 @@ export const decisionRepository = {
       created.status
     );
 
+    scheduleRagIndex("decision", created.id);
     return decisionRepository.getById(created.id);
   },
 
@@ -181,6 +183,7 @@ export const decisionRepository = {
       await clearDecisionReminders(id);
     }
 
+    scheduleRagIndex("decision", id);
     return decisionRepository.getById(id);
   },
 
@@ -217,12 +220,15 @@ export const decisionRepository = {
 
     await clearDecisionReminders(id);
 
+    scheduleRagIndex("decision", id);
     return decisionRepository.getById(id);
   },
 
   async softDelete(id: string, userId: string) {
     await clearDecisionReminders(id);
-    return db.decision.update({ where: { id }, data: { deletedAt: new Date(), updatedBy: userId } });
+    await db.decision.update({ where: { id }, data: { deletedAt: new Date(), updatedBy: userId } });
+    scheduleRagRemove("decision", id);
+    return db.decision.findFirst({ where: { id } });
   },
 };
 
@@ -244,15 +250,21 @@ export const productRepository = {
   },
 
   async create(data: { name: string; slug: string; description?: string }) {
-    return db.product.create({ data });
+    const product = await db.product.create({ data });
+    scheduleRagIndex("product", product.id);
+    return product;
   },
 
   async update(id: string, data: Partial<{ name: string; description: string | null; status: string }>) {
-    return db.product.update({ where: { id }, data });
+    const product = await db.product.update({ where: { id }, data });
+    scheduleRagIndex("product", id);
+    return product;
   },
 
   async softDelete(id: string) {
-    return db.product.update({ where: { id }, data: { deletedAt: new Date() } });
+    const product = await db.product.update({ where: { id }, data: { deletedAt: new Date() } });
+    scheduleRagRemove("product", id);
+    return product;
   },
 };
 
@@ -267,7 +279,9 @@ export const revenueRepository = {
   },
 
   async create(data: Prisma.RevenueEntryCreateInput) {
-    return db.revenueEntry.create({ data });
+    const entry = await db.revenueEntry.create({ data });
+    scheduleRagIndex("revenue_entry", entry.id);
+    return entry;
   },
 
   async getMrr() {
@@ -307,11 +321,15 @@ export const complianceRepository = {
   },
 
   async create(data: Prisma.ComplianceItemCreateInput) {
-    return db.complianceItem.create({ data });
+    const item = await db.complianceItem.create({ data });
+    scheduleRagIndex("compliance", item.id);
+    return item;
   },
 
   async update(id: string, data: Prisma.ComplianceItemUpdateInput) {
-    return db.complianceItem.update({ where: { id }, data });
+    const item = await db.complianceItem.update({ where: { id }, data });
+    scheduleRagIndex("compliance", id);
+    return item;
   },
 
   async getDeadlines(days = 30) {
@@ -346,15 +364,21 @@ export const riskRepository = {
   },
 
   async create(data: { title: string; description?: string; category: RiskCategory; level?: RiskLevel; mitigation?: string; ownerId?: string; reviewDate?: Date }) {
-    return db.risk.create({ data });
+    const risk = await db.risk.create({ data });
+    scheduleRagIndex("risk", risk.id);
+    return risk;
   },
 
   async update(id: string, data: Partial<{ title: string; description: string | null; category: RiskCategory; level: RiskLevel; mitigation: string | null; reviewDate: Date | null }>) {
-    return db.risk.update({ where: { id }, data });
+    const risk = await db.risk.update({ where: { id }, data });
+    scheduleRagIndex("risk", id);
+    return risk;
   },
 
   async softDelete(id: string) {
-    return db.risk.update({ where: { id }, data: { deletedAt: new Date() } });
+    const risk = await db.risk.update({ where: { id }, data: { deletedAt: new Date() } });
+    scheduleRagRemove("risk", id);
+    return risk;
   },
 };
 
@@ -364,15 +388,21 @@ export const competitorRepository = {
   },
 
   async create(data: Prisma.CompetitorCreateInput) {
-    return db.competitor.create({ data });
+    const competitor = await db.competitor.create({ data });
+    scheduleRagIndex("competitor", competitor.id);
+    return competitor;
   },
 
   async update(id: string, data: Prisma.CompetitorUpdateInput) {
-    return db.competitor.update({ where: { id }, data });
+    const competitor = await db.competitor.update({ where: { id }, data });
+    scheduleRagIndex("competitor", id);
+    return competitor;
   },
 
   async softDelete(id: string) {
-    return db.competitor.update({ where: { id }, data: { deletedAt: new Date() } });
+    const competitor = await db.competitor.update({ where: { id }, data: { deletedAt: new Date() } });
+    scheduleRagRemove("competitor", id);
+    return competitor;
   },
 };
 
@@ -382,10 +412,14 @@ export const apiRegistryRepository = {
   },
 
   async create(data: Prisma.ApiRegistryEntryCreateInput) {
-    return db.apiRegistryEntry.create({ data });
+    const entry = await db.apiRegistryEntry.create({ data });
+    scheduleRagIndex("api_registry", entry.id);
+    return entry;
   },
 
   async update(id: string, data: Prisma.ApiRegistryEntryUpdateInput) {
-    return db.apiRegistryEntry.update({ where: { id }, data });
+    const entry = await db.apiRegistryEntry.update({ where: { id }, data });
+    scheduleRagIndex("api_registry", id);
+    return entry;
   },
 };

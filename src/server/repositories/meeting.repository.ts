@@ -2,6 +2,7 @@ import { db } from "@/lib/db";
 import { mapCalendarEventToMeeting } from "@/lib/meetings/calendar-import";
 import type { CalendarEventInput } from "@/lib/meetings/calendar-import";
 import { syncMeetingReminders } from "@/lib/meetings/reminders";
+import { scheduleRagIndex, scheduleRagRemove } from "@/server/ai/rag/indexer.service";
 import { Prisma, type MeetingOutcome, type MeetingStatus, type MeetingType } from "@prisma/client";
 
 export type MeetingCreateInput = {
@@ -117,6 +118,7 @@ export const meetingRepository = {
       meeting.status
     );
 
+    scheduleRagIndex("meeting", meeting.id);
     return meeting;
   },
 
@@ -150,6 +152,7 @@ export const meetingRepository = {
       meeting.status
     );
 
+    scheduleRagIndex("meeting", meeting.id);
     return meeting;
   },
 
@@ -160,6 +163,7 @@ export const meetingRepository = {
     });
     const { clearMeetingReminders } = await import("@/lib/meetings/reminders");
     await clearMeetingReminders(id);
+    scheduleRagRemove("meeting", id);
     return meeting;
   },
 
@@ -218,6 +222,7 @@ export const meetingRepository = {
         );
         results.updated += 1;
         results.meetings.push(meeting.id);
+        scheduleRagIndex("meeting", meeting.id);
       } else {
         const meeting = await db.meeting.create({
           data: mapped,
@@ -232,6 +237,7 @@ export const meetingRepository = {
         );
         results.created += 1;
         results.meetings.push(meeting.id);
+        scheduleRagIndex("meeting", meeting.id);
       }
     }
 
