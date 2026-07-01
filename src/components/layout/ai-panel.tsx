@@ -1,8 +1,9 @@
 "use client";
 
-import { Suspense, useEffect, useState } from "react";
+import { Suspense, useCallback, useEffect, useRef, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import {
+  ArrowDown,
   BookOpen,
   ChevronLeft,
   ChevronRight,
@@ -52,6 +53,27 @@ function AiPanelInner() {
   const [exportingJournal, setExportingJournal] = useState(false);
   const [exportingDecision, setExportingDecision] = useState(false);
   const { pushMessage, onInputChange, handleHistoryKeyDown } = useMessageHistory();
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const isAtBottomRef = useRef(true);
+  const [showScrollButton, setShowScrollButton] = useState(false);
+
+  const checkScrollPosition = useCallback(() => {
+    const container = scrollContainerRef.current;
+    if (!container) return;
+
+    const threshold = 80;
+    const atBottom =
+      container.scrollHeight - container.scrollTop - container.clientHeight < threshold;
+    isAtBottomRef.current = atBottom;
+    setShowScrollButton(!atBottom);
+  }, []);
+
+  const scrollToBottom = useCallback((behavior: ScrollBehavior = "smooth") => {
+    messagesEndRef.current?.scrollIntoView({ behavior });
+    isAtBottomRef.current = true;
+    setShowScrollButton(false);
+  }, []);
 
   const { messages, loading, hydrating, sendMessage, startNewChat } = useAiChat({
     contextKey,
@@ -66,6 +88,16 @@ function AiPanelInner() {
     window.addEventListener("focus", handleRefresh);
     return () => window.removeEventListener("focus", handleRefresh);
   }, []);
+
+  useEffect(() => {
+    if (isAtBottomRef.current) {
+      scrollToBottom(hydrating ? "auto" : "smooth");
+    }
+  }, [messages, loading, hydrating, scrollToBottom]);
+
+  useEffect(() => {
+    checkScrollPosition();
+  }, [hydrating, checkScrollPosition]);
 
   const exportableMessages = getExportableMessages(messages, welcomeMessage);
   const canExport =
@@ -283,20 +315,40 @@ function AiPanelInner() {
           </div>
         </div>
 
-        <div className="flex-1 overflow-y-auto p-3">
-          {hydrating ? (
-            <div className="rounded-lg bg-muted px-3 py-2 text-sm text-muted-foreground">
-              Loading conversation…
-            </div>
-          ) : (
-            <AiConversationView
-              messages={messages}
-              loading={loading}
-              compact
-              welcomeMessage={welcomeMessage}
-              onCopyMessage={copyMessage}
-            />
-          )}
+        <div className="relative min-h-0 flex-1">
+          <div
+            ref={scrollContainerRef}
+            className="h-full overflow-y-auto p-3"
+            onScroll={checkScrollPosition}
+          >
+            {hydrating ? (
+              <div className="rounded-lg bg-muted px-3 py-2 text-sm text-muted-foreground">
+                Loading conversation…
+              </div>
+            ) : (
+              <AiConversationView
+                messages={messages}
+                loading={loading}
+                compact
+                welcomeMessage={welcomeMessage}
+                onCopyMessage={copyMessage}
+              />
+            )}
+            <div ref={messagesEndRef} />
+          </div>
+          {showScrollButton ? (
+            <Button
+              type="button"
+              variant="outline"
+              size="icon"
+              className="absolute bottom-3 left-1/2 h-8 w-8 -translate-x-1/2 rounded-full border-border bg-card shadow-md"
+              onClick={() => scrollToBottom()}
+              aria-label="Scroll to latest message"
+              title="Jump to latest reply"
+            >
+              <ArrowDown className="h-4 w-4" />
+            </Button>
+          ) : null}
         </div>
 
         <div className="space-y-2 border-t border-border p-3">
@@ -395,7 +447,7 @@ function AiPanelInner() {
 
       <aside
         className={cn(
-          "hidden shrink-0 flex-col border-l border-border bg-card transition-all duration-250 ease-out lg:flex",
+          "hidden min-h-0 shrink-0 flex-col border-l border-border bg-card transition-all duration-250 ease-out lg:flex",
           aiPanelOpen ? "w-[360px]" : "w-0 overflow-hidden border-l-0"
         )}
       >
